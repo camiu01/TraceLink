@@ -1,0 +1,5 @@
+.pio/
+.venv/
+.vscode/
+__pycache__/
+include/local_config.h

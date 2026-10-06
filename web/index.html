@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101916">
+  <title>TraceLink · Monitor bus</title>
+  <style>
+    :root { color-scheme: dark; --bg:#101916; --panel:#17221e; --line:#34443b; --text:#edf3ed; --muted:#abbcb0; --accent:#b9ed80; --error:#ffada6; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:14px system-ui,sans-serif; }
+    main { max-width:1280px; margin:auto; padding:32px 24px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:24px; margin-bottom:32px; }
+    h1 { font-size:32px; letter-spacing:-1px; margin:0 0 8px; }
+    h1 span { color:var(--accent); }
+    p { margin:0; color:var(--muted); line-height:1.6; }
+    .eyebrow { font:12px ui-monospace,monospace; letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; }
+    #connection { border:1px solid var(--line); border-radius:24px; padding:12px 16px; white-space:nowrap; }
+    #connection[data-state=ok] { color:var(--accent); }
+    #connection[data-state=error] { color:var(--error); }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; margin-bottom:24px; }
+    .card { padding:24px; background:var(--panel); border:1px solid var(--line); border-radius:12px; }
+    .card h2 { margin:0 0 16px; font-size:16px; font-weight:500; }
+    .value { font:32px ui-monospace,monospace; margin-bottom:8px; }
+    .unit { font:12px system-ui,sans-serif; color:var(--muted); margin-left:8px; }
+    .rate-tools { display:flex; gap:8px; margin-top:16px; }
+    .rate-tools select { min-width:0; width:100%; }
+    .control { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:24px; margin-bottom:24px; }
+    .control h2 { margin:0 0 16px; font-size:20px; }
+    .control p { margin-bottom:16px; }
+    .control .tools { margin-bottom:0; }
+    .form-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:24px 0 16px; }
+    .field { display:flex; flex-direction:column; gap:8px; }
+    .wide { grid-column:1/-1; }
+    input,textarea { min-height:44px; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font:14px ui-monospace,monospace; width:100%; }
+    textarea { resize:vertical; }
+    input:focus-visible,textarea:focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
+    button:disabled,select:disabled { opacity:.5; cursor:not-allowed; }
+    button.danger { color:var(--error); border-color:var(--error); }
+    #tx-state,#scan-results { color:var(--muted); }
+    .tools { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:16px; }
+    label { color:var(--muted); }
+    button,select { min-height:44px; padding:8px 16px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--text); font:inherit; cursor:pointer; }
+    button:hover,select:hover { border-color:var(--accent); }
+    button:focus-visible,select:focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
+    button.primary { background:var(--accent); border-color:var(--accent); color:var(--bg); font-weight:600; }
+    #summary { margin-left:auto; font:12px ui-monospace,monospace; color:var(--muted); }
+    .stream { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel); }
+    .stream-title { display:flex; justify-content:space-between; align-items:center; padding:16px 24px; border-bottom:1px solid var(--line); }
+    .stream-title h2 { margin:0; font-size:16px; font-weight:500; }
+    .tag { font:12px ui-monospace,monospace; color:var(--accent); }
+    .scroll { max-height:520px; overflow:auto; }
+    table { width:100%; border-collapse:collapse; text-align:left; font:12px ui-monospace,monospace; }
+    th { position:sticky; top:0; background:var(--panel); color:var(--muted); font-weight:400; }
+    th,td { padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:top; }
+    td:first-child,td:nth-child(2),td:nth-child(3) { white-space:nowrap; }
+    td:nth-child(4) { min-width:160px; }
+    td:nth-child(5) { min-width:240px; overflow-wrap:anywhere; }
+    td:nth-child(6) { min-width:160px; overflow-wrap:anywhere; }
+    td.bus { color:var(--accent); }
+    #empty { padding:48px 24px; text-align:center; }
+    #empty strong { display:block; font-size:20px; margin-bottom:12px; }
+    #notice { margin:16px 0; color:var(--error); min-height:24px; }
+    footer { display:flex; flex-wrap:wrap; justify-content:space-between; gap:16px; margin-top:24px; color:var(--muted); font-size:12px; line-height:1.6; }
+    [hidden] { display:none !important; }
+    @media(max-width:640px) { main { padding:24px 16px; } header { align-items:flex-start; flex-direction:column; } .cards,.form-grid { grid-template-columns:1fr; } .card,.control { padding:16px; } .value { font-size:24px; } #summary { margin-left:0; width:100%; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><p class="eyebrow">ESP32 / monitor multi-interfaccia</p><h1>Trace<span>Link</span></h1><p>Osserva il traffico. Invia solo quando lo decidi.</p></div>
+    <div id="connection" role="status" data-state="loading">Connessione…</div>
+  </header>
+  <section id="cards" class="cards" aria-label="Contatori delle interfacce"></section>
+  <section class="control" aria-labelledby="control-heading">
+    <h2 id="control-heading">Velocità e comandi</h2>
+    <p>Il controllo ascolta per circa 5 secondi: servono dati sulle linee. Le stime seriali vanno confermate; la velocità CAN rilevata viene applicata.</p>
+    <div class="tools"><button id="scan">Controlla velocità</button><button id="arm" class="danger">Abilita trasmissione</button><span id="tx-state">TX disabilitata al boot</span></div>
+    <p id="scan-results" style="margin-top:16px" role="status">Nessun controllo eseguito.</p>
+    <div class="tools">
+      <label for="system">Sistema</label><select id="system"><option value="">Comando libero</option></select>
+      <label for="preset">Comando salvato</label><select id="preset" disabled><option value="">Seleziona un sistema</option></select>
+      <button id="load-preset" disabled>Carica nei campi</button>
+    </div>
+    <form id="send-form">
+      <div class="form-grid">
+        <div class="field"><label for="send-bus">Interfaccia di invio</label><select id="send-bus" name="bus"></select></div>
+        <div class="field"><label for="encoding">Formato dati</label><select id="encoding" name="encoding"><option value="hex">HEX</option><option value="text">Testo UTF-8</option></select></div>
+        <div class="field"><label for="ending">Terminatore testo</label><select id="ending"><option value="">Nessuno</option><option value="lf">LF</option><option value="crlf">CR+LF</option></select></div>
+        <div class="field can-field" hidden><label for="can-id">ID CAN (HEX, senza 0x)</label><input id="can-id" name="id" value="123" maxlength="8"></div>
+        <div class="field can-field" hidden><label for="can-type">Formato frame CAN</label><select id="can-type" name="extended"><option value="0">Standard / 11 bit</option><option value="1">Esteso / 29 bit</option></select></div>
+        <div class="field can-field" hidden><label for="can-rtr">Tipo CAN</label><select id="can-rtr" name="rtr"><option value="0">Dati</option><option value="1">Richiesta remota (RTR)</option></select></div>
+        <div class="field" id="dlc-field" hidden><label for="can-dlc">DLC RTR</label><input id="can-dlc" name="dlc" type="number" min="0" max="8" value="0"></div>
+        <div class="field wide"><label for="payload">Comando / dati (massimo 64 byte seriali, 8 byte CAN)</label><textarea id="payload" name="data" rows="2" placeholder="Esempio HEX: 01 03 00 00 00 02 C4 0B"></textarea></div>
+      </div>
+      <div class="tools"><button id="send" type="submit" disabled>Invia una volta</button><span id="command-result" role="status">Nessun comando inviato.</span></div>
+    </form>
+  </section>
+  <div class="tools">
+    <label for="filter">Interfaccia</label>
+    <select id="filter"><option value="all">Tutte le interfacce</option></select>
+    <button id="pause">Pausa vista</button>
+    <button id="clear">Pulisci vista</button>
+    <button id="export" class="primary">Esporta CSV</button>
+    <span id="summary">0 record in vista / massimo 500</span>
+  </div>
+  <section class="stream" aria-labelledby="stream-heading">
+    <div class="stream-title"><h2 id="stream-heading">Traffico e invii</h2><span id="mode-tag" class="tag">RX ONLY</span></div>
+    <div class="scroll">
+      <table id="table" hidden><thead><tr><th scope="col">#</th><th scope="col">Tempo ESP32</th><th scope="col">Bus / direzione</th><th scope="col">Frame</th><th scope="col">Dati HEX</th><th scope="col">ASCII</th></tr></thead><tbody id="rows"></tbody></table>
+      <div id="empty"><strong>In attesa di dati</strong><p>Collega un transceiver e verifica baud rate, cablaggio e massa.<br>Le porte seriali mostrano blocchi di byte, non messaggi decodificati.</p></div>
+    </div>
+  </section>
+  <p id="notice" role="status"></p>
+  <footer><span id="health">Cronologia ESP32: 128 record · Vista browser: 500 record</span><span>TX disabilitata al boot · CAN classico, non CAN FD</span></footer>
+</main>
+<script>
+	/**
+	 * @file TraceLink local dashboard: polling, filters, TX controls, CSV export.
+	 * Bus payloads are untrusted input and are rendered as text only.
+	 */
+	'use strict';
+	/** Shorthand for document.getElementById. */
+	const $ = id => document.getElementById(id);
+	let cursor = 0, boot = null, paused = false, records = [], missed = 0;
+	let lastData = null;
+	let descriptors = [], connected = false, posting = false, systems = [];
+	const serialRates = [1200,2400,4800,9600,19200,38400,57600,115200];
+	const canRates = [125000,250000,500000,1000000];
+	/**
+	 * Rebuilds interface cards and selectors when the bus set changes.
+	 * @param {Array} interfaces Bus descriptors from /api/events.
+	 * @returns {void}
+	 */
+	function buildInterfaces(interfaces) {
+		const key = interfaces.map(bus => `${bus.name}:${bus.protocol}`).join(',');
+		if ($('cards').dataset.key === key) return;
+		descriptors = interfaces;
+		$('cards').dataset.key = key;
+		$('cards').replaceChildren();
+		$('send-bus').replaceChildren();
+		$('filter').replaceChildren(new Option('Tutte le interfacce','all'));
+		interfaces.forEach((bus, index) => {
+			$('send-bus').add(new Option(bus.name, bus.name));
+			$('filter').add(new Option(bus.name, bus.name));
+			const card = document.createElement('article'); card.className = 'card';
+			const title = document.createElement('h2'); title.textContent = `${String(index + 1).padStart(2,'0')} / ${bus.name}`;
+			const value = document.createElement('div'); value.className = 'value';
+			const count = document.createElement('span'); count.id = `count-${index}`;
+			const unit = document.createElement('span'); unit.className = 'unit'; unit.textContent = bus.protocol === 'can' ? 'record RX/TX' : 'blocchi RX/TX';
+			value.append(count,unit);
+			const rate = document.createElement('p'); rate.id = `rate-${index}`;
+			const tools = document.createElement('div'); tools.className = 'rate-tools';
+			const select = document.createElement('select'); select.id = `speed-${index}`; select.setAttribute('aria-label',`Velocità ${bus.name}`);
+			(bus.protocol === 'can' ? canRates : serialRates).forEach(speed => select.add(new Option(String(speed),String(speed))));
+			select.value = String(bus.rate);
+			const apply = document.createElement('button'); apply.textContent = 'Applica'; apply.className = 'rate-apply';
+			apply.addEventListener('click', () => postControl({action:'rate',bus:bus.name,rate:select.value}));
+			tools.append(select,apply); card.append(title,value,rate,tools); $('cards').append(card);
+		});
+		updateSendFields();
+	}
+	/**
+	 * Checks whether the selected send interface uses the CAN protocol.
+	 * @returns {boolean} True for CAN, false for serial buses.
+	 */
+	function isCanSelected() { return descriptors.find(bus => bus.name === $('send-bus').value)?.protocol === 'can'; }
+	/**
+	 * Shows CAN-only fields and locks text encoding for CAN frames.
+	 * @returns {void}
+	 */
+	function updateSendFields() {
+		const isCan = isCanSelected();
+		document.querySelectorAll('.can-field').forEach(field => { field.hidden = !isCan; });
+		if (isCan) $('encoding').value = 'hex';
+		$('encoding').disabled = isCan;
+		$('ending').disabled = isCan || $('encoding').value !== 'text';
+		$('dlc-field').hidden = !isCan || $('can-rtr').value !== '1';
+	}
+	/**
+	 * Enables/disables controls from connection, TX, and scan state.
+	 * @returns {void}
+	 */
+	function updateControlState() {
+		const busy = !connected || posting || !lastData || lastData.busy || lastData.scanning;
+		$('scan').disabled = busy || lastData?.armed;
+		$('arm').disabled = busy;
+		$('send').disabled = busy || !lastData?.armed;
+		document.querySelectorAll('.rate-apply').forEach(button => { button.disabled = busy; });
+	}
+	/**
+	 * Posts one control request; never retries automatically after errors.
+	 * @param {Object} values Form-encoded control parameters.
+	 * @returns {Promise<void>}
+	 */
+	async function postControl(values) {
+		if (!connected || !boot || posting) return;
+		posting = true; updateControlState();
+		try {
+			const response = await fetch('/api/control', {method:'POST',headers:{'X-TraceLink':boot},body:new URLSearchParams(values),signal:AbortSignal.timeout(5000)});
+			const result = await response.text();
+			$('command-result').textContent = result;
+			if (!response.ok) throw new Error(result);
+		} catch (error) { $('command-result').textContent = error.message + ' Nessun reinvio automatico.'; }
+		finally { posting = false; updateControlState(); }
+	}
+	/**
+	 * Returns records matching the interface filter.
+	 * @returns {Array} Visible records.
+	 */
+	function visibleRecords() {
+		const filter = $('filter').value;
+		return records.filter(record => filter === 'all' || record.source === filter);
+	}
+	/**
+	 * Renders HEX bytes as printable ASCII, masking non-printables.
+	 * @param {string} hex Space-separated HEX bytes.
+	 * @returns {string} ASCII preview.
+	 */
+	function ascii(hex) {
+		return hex ? hex.split(' ').map(byte => {
+			const value = parseInt(byte, 16);
+			return value >= 32 && value <= 126 ? String.fromCharCode(value) : '·';
+		}).join('') : '';
+	}
+	/**
+	 * Describes one record frame (byte count or CAN id/flags/DLC).
+	 * @param {Object} record Event record.
+	 * @returns {string} Frame description.
+	 */
+	function frame(record) {
+		if (record.source !== 'CAN') return `${record.hex ? record.hex.split(' ').length : 0} byte`;
+		return `${record.id.toString(16).toUpperCase().padStart(record.ext ? 8 : 3, '0')} / ${record.ext ? 'EXT' : 'STD'}${record.rtr ? ' RTR' : ''} / DLC ${record.dlc}`;
+	}
+	/**
+	 * Renders visible records into the table using text content only.
+	 * @returns {void}
+	 */
+	function render() {
+		const visible = visibleRecords();
+		const fragment = document.createDocumentFragment();
+		for (const record of visible) {
+			const row = document.createElement('tr');
+			[record.seq, `${record.ms} ms`, `${record.source} ${record.tx ? 'TX' : 'RX'}`, frame(record), record.hex || '—', ascii(record.hex)].forEach((value, index) => {
+				const cell = document.createElement('td');
+				cell.textContent = value; // Bus bytes are never interpreted as HTML.
+				if (index === 2) cell.className = 'bus';
+				row.appendChild(cell);
+			});
+			fragment.appendChild(row);
+		}
+		$('rows').replaceChildren(fragment);
+		$('table').hidden = visible.length === 0;
+		$('empty').hidden = visible.length > 0;
+		$('summary').textContent = `${visible.length} visibili / ${records.length} in memoria / massimo 500`;
+	}
+	/**
+	 * Updates counters, health, and loss warnings from a poll payload.
+	 * @param {Object} data Parsed /api/events payload.
+	 * @returns {void}
+	 */
+	function updateStats(data) {
+		data.interfaces.forEach((bus, i) => {
+			$('count-' + i).textContent = bus.count.toLocaleString('it-IT');
+			$('rate-' + i).textContent = bus.protocol === 'can' ? `${bus.rate / 1000} kbit/s · ${bus.ready ? (data.armed ? 'modo normale / ACK attivi' : 'solo ascolto') : 'non disponibile'}` : `${bus.rate.toLocaleString('it-IT')} baud · ${bus.ready ? 'attiva' : 'non disponibile'}`;
+		});
+		$('health').textContent = `ESP32: ${Math.floor(data.uptime / 1000)} s · Cronologia sovrascritta: ${data.overwritten} · CAN persi: ${data.canMissed}, overrun: ${data.canOverrun}, errori: ${data.canErrors}`;
+		const warnings = [];
+		if (missed) warnings.push(`${missed} record non recuperati dal browser.`);
+		if (!data.canReady) warnings.push('Driver CAN non disponibile. Controlla il monitor USB.');
+		if (data.canMissed || data.canOverrun) warnings.push('Perdita di frame nella ricezione CAN.');
+		$('notice').textContent = warnings.join(' ');
+	}
+	/**
+	 * Updates TX/scan controls; safety state refreshes even when paused.
+	 * @param {Object} data Parsed /api/events payload.
+	 * @returns {void}
+	 */
+	function updateCommands(data) {
+		$('arm').textContent = data.armed ? 'Disabilita trasmissione' : 'Abilita trasmissione';
+		$('tx-state').textContent = data.armed ? 'TX ABILITATA · CAN invia ACK' : 'TX disabilitata · ascolto passivo';
+		$('mode-tag').textContent = data.armed ? 'RX + TX' : 'RX ONLY';
+		$('scan').textContent = data.scanning ? 'Controllo in corso…' : 'Controlla velocità';
+		$('scan-results').textContent = data.scanning ? 'Ascolto delle linee in corso…' : `Stime: RS232 ${data.estimates[0] || 'non rilevata'} baud · RS485 ${data.estimates[1] || 'non rilevata'} baud · CAN ${data.canDetected ? data.canDetected / 1000 + ' kbit/s (applicata)' : 'non rilevata'}.`;
+		if (!posting) $('command-result').textContent = data.message;
+		updateControlState();
+	}
+	/**
+	 * Polls /api/events, handles boot changes, and reschedules itself.
+	 * @returns {Promise<void>}
+	 */
+	async function poll() {
+		let nextDelay = 250;
+		try {
+			const response = await fetch(`/api/events?after=${cursor}`, {cache:'no-store', signal:AbortSignal.timeout(4000)});
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			const data = await response.json();
+			connected = true;
+			buildInterfaces(data.interfaces);
+			if (boot !== null && boot !== data.boot) {
+				cursor = 0; records = []; missed = 0; boot = data.boot;
+				if (!paused) render();
+				nextDelay = 0;
+			} else {
+				boot = data.boot;
+				missed += data.lost;
+				if (data.events.length) {
+					cursor = data.events[data.events.length - 1].seq;
+					records = records.concat(data.events).slice(-500);
+					if (!paused) render();
+				}
+				if (cursor < data.latest) nextDelay = 25;
+			}
+			lastData = data;
+			if (!paused) updateStats(data);
+			updateCommands(data); // Safety state must update even when the view is paused.
+			$('connection').textContent = paused ? 'Connesso · vista in pausa' : 'Connesso · acquisizione attiva';
+			$('connection').dataset.state = 'ok';
+		} catch (error) {
+			connected = false; updateControlState();
+			$('connection').textContent = 'ESP32 non raggiungibile';
+			$('connection').dataset.state = 'error';
+			$('notice').textContent = 'Verifica la connessione alla rete TraceLink-ESP32. Nuovo tentativo automatico.';
+			nextDelay = 1500;
+		} finally {
+			setTimeout(poll, nextDelay);
+		}
+	}
+	$('filter').addEventListener('change', render);
+	$('send-bus').addEventListener('change', updateSendFields);
+	fetch('/api/systems', {cache:'no-store'}).then(response => {
+		if (!response.ok) throw new Error('Profili non disponibili');
+		return response.json();
+	}).then(data => {
+		systems = data;
+		systems.forEach((system,index) => $('system').add(new Option(system.name,String(index))));
+	}).catch(() => { $('system').disabled = true; });
+	$('system').addEventListener('change', () => {
+		const system = systems[$('system').value];
+		$('preset').replaceChildren();
+		$('preset').disabled = !system || system.commands.length === 0;
+		$('load-preset').disabled = $('preset').disabled;
+		if (system) system.commands.forEach((command,index) => $('preset').add(new Option(command.name,String(index))));
+	});
+	$('load-preset').addEventListener('click', () => {
+		const system = systems[$('system').value];
+		const command = system?.commands[$('preset').value];
+		if (!command) return;
+		const index = descriptors.findIndex(bus => bus.name === system.bus);
+		if (index < 0) { $('command-result').textContent = 'Interfaccia del profilo non disponibile.'; return; }
+		$('send-bus').value = system.bus;
+		$('encoding').value = command.encoding;
+		$('ending').value = '';
+		$('payload').value = command.data;
+		$('can-id').value = command.id || '123';
+		$('can-type').value = command.extended ? '1' : '0';
+		$('can-rtr').value = command.rtr ? '1' : '0';
+		$('can-dlc').value = String(command.dlc || 0);
+		$('speed-' + index).value = String(system.rate);
+		updateSendFields();
+		$('command-result').textContent = 'Profilo caricato. Applica la velocità se necessario, poi abilita TX e invia. Nessun invio automatico.';
+	});
+	$('encoding').addEventListener('change', updateSendFields);
+	$('can-rtr').addEventListener('change', updateSendFields);
+	$('scan').addEventListener('click', () => postControl({action:'scan'}));
+	$('arm').addEventListener('click', () => {
+		if (!lastData) return;
+		if (!lastData.armed && !confirm('Abilitare TX? CAN passerà in modo normale e invierà ACK. Verifica cablaggio, velocità e sicurezza del dispositivo prima di procedere.')) return;
+		postControl({action:lastData.armed ? 'disarm' : 'arm'});
+	});
+	$('send-form').addEventListener('submit', event => {
+		event.preventDefault();
+		if (!lastData?.armed || !connected || posting) return;
+		let payload = $('payload').value;
+		if ($('encoding').value === 'text') payload += $('ending').value === 'crlf' ? '\r\n' : $('ending').value === 'lf' ? '\n' : '';
+		postControl({action:'send',bus:$('send-bus').value,encoding:$('encoding').value,data:payload,id:$('can-id').value,extended:$('can-type').value,rtr:$('can-rtr').value,dlc:$('can-dlc').value});
+	});
+	$('pause').addEventListener('click', () => {
+		paused = !paused;
+		$('pause').textContent = paused ? 'Riprendi vista' : 'Pausa vista';
+		$('pause').setAttribute('aria-pressed', String(paused));
+		if (!paused) { render(); if (lastData) updateStats(lastData); }
+	});
+	$('clear').addEventListener('click', () => { records = []; render(); });
+	$('export').addEventListener('click', () => {
+		const lines = [['sequenza','tempo_ms','bus','direzione','frame','hex','ascii'], ...visibleRecords().map(record =>
+			[record.seq,record.ms,record.source,record.tx ? 'TX' : 'RX',frame(record),record.hex,ascii(record.hex)])];
+		// Neutralize spreadsheet formulas derived from untrusted serial bytes.
+		const csvCell = value => {
+			let text = String(value);
+			if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
+			return '"' + text.replaceAll('"','""') + '"';
+		};
+		const csv = '\uFEFF' + lines.map(line => line.map(csvCell).join(';')).join('\r\n');
+		const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+		const link = document.createElement('a');
+		link.href = url; link.download = 'TraceLink.csv'; link.click();
+		setTimeout(() => URL.revokeObjectURL(url), 1000);
+	});
+	poll();
+</script>
+</body>
+</html>

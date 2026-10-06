@@ -1,0 +1,19 @@
+[
+  {
+    "name": "Serial example, adapt to your device",
+    "bus": "RS232",
+    "rate": 9600,
+    "commands": [
+      {
+        "name": "Example text (verify the protocol)",
+        "encoding": "text",
+        "data": "STATUS\r\n"
+      },
+      {
+        "name": "Example HEX bytes",
+        "encoding": "hex",
+        "data": "01 02 03"
+      }
+    ]
+  }
+]
