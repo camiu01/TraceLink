@@ -101,13 +101,14 @@
     <label for="filter">Interfaccia</label>
     <select id="filter"><option value="all">Tutte le interfacce</option></select>
     <button id="pause">Pausa vista</button>
+    <label><input id="follow" type="checkbox" checked> Scorrimento automatico</label>
     <button id="clear">Pulisci vista</button>
     <button id="export" class="primary">Esporta CSV</button>
     <span id="summary">0 record in vista / massimo 500</span>
   </div>
   <section class="stream" aria-labelledby="stream-heading">
     <div class="stream-title"><h2 id="stream-heading">Traffico e invii</h2><span id="mode-tag" class="tag">RX ONLY</span></div>
-    <div class="scroll">
+    <div class="scroll" id="traffic-scroll">
       <table id="table" hidden><thead><tr><th scope="col">#</th><th scope="col">Tempo ESP32</th><th scope="col">Bus / direzione</th><th scope="col">Frame</th><th scope="col">Dati HEX</th><th scope="col">ASCII</th></tr></thead><tbody id="rows"></tbody></table>
       <div id="empty"><strong>In attesa di dati</strong><p>Collega un transceiver e verifica baud rate, cablaggio e massa.<br>Le porte seriali mostrano blocchi di byte, non messaggi decodificati.</p></div>
     </div>
@@ -238,6 +239,8 @@
 	 * @returns {void}
 	 */
 	function render() {
+		const viewport = $('traffic-scroll');
+		const previousTop = viewport.scrollTop;
 		const visible = visibleRecords();
 		const fragment = document.createDocumentFragment();
 		for (const record of visible) {
@@ -254,6 +257,7 @@
 		$('table').hidden = visible.length === 0;
 		$('empty').hidden = visible.length > 0;
 		$('summary').textContent = `${visible.length} visibili / ${records.length} in memoria / massimo 500`;
+		viewport.scrollTop = $('follow').checked ? viewport.scrollHeight : previousTop;
 	}
 	/**
 	 * Updates counters, health, and loss warnings from a poll payload.
@@ -328,6 +332,15 @@
 		}
 	}
 	$('filter').addEventListener('change', render);
+	$('traffic-scroll').addEventListener('scroll', () => {
+		const viewport = $('traffic-scroll');
+		if (viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop > 24) {
+			$('follow').checked = false;
+		}
+	});
+	$('follow').addEventListener('change', () => {
+		if ($('follow').checked) $('traffic-scroll').scrollTop = $('traffic-scroll').scrollHeight;
+	});
 	$('send-bus').addEventListener('change', updateSendFields);
 	fetch('/api/systems', {cache:'no-store'}).then(response => {
 		if (!response.ok) throw new Error('Profili non disponibili');

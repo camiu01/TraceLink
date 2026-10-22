@@ -4,15 +4,16 @@
 
 TraceLink receives RS232 on UART2, RS485 on UART1 and classic CAN on the built-in TWAI controller at the same time. It shows traffic and loss counters on the USB monitor and on a page served by the ESP32 access point, with no Internet and no external web dependencies. Transmission stays disabled at boot and requires explicit arming with automatic disarm 60 seconds after the last send.
 
-## What's new on 2026-10-06
+## What's new on 2026-10-22
 
 Build is green after the user lifted the pause and authorized firmware work:
 
-- **Firmware compiles:** `firmware.bin` (~805 kB) from `.venv/bin/pio run` (RAM 20.0%, Flash 62.3%), `web_page.h` regenerates from `web/` on every build.
+- **Firmware compiles:** latest PlatformIO build passed (RAM 20.0%, Flash 62.5%); `web_page.h` regenerates from `web/` on every build.
+- **Dashboard autoscroll:** follows new traffic, stops when scrolling up, and resumes with the checkbox. Browser checks with simulated APIs, native C++ tests, and JavaScript syntax checks passed. This dashboard update has not yet been uploaded.
 - **Arduino C++11 fixes:** `BusHealth` constructor replaces brace init rejected under `gnu++11`; explicit `twai_general_config_t` / `twai_timing_config_t` / `twai_filter_config_t` replace `auto` on TWAI macros.
 - **Validated wiring map:** isolated auto-direction RS485 module (`TX -> GPIO26`, `RX <- GPIO27`, GPIO25 unconnected) and SP3232 RS232 module (crossed `TXD -> GPIO16`, `RXD <- GPIO17`) at 3.3 V; UART0 stays free for USB flash and monitor.
 - **English documentation:** README, project status and agent instructions translated; Doxygen file/function headers plus JSDoc on the dashboard; tabs for indentation.
-- **Not yet done:** no upload and no hardware trial. No ESP32 is visible on this host USB, and the previous wiring (232 on RX0/TX0, 485 on TX2/RX2) still needs physical correction.
+- **Hardware bring-up:** previous firmware uploaded successfully on COM7; serial boot reported RX-only and the access point. The user reports working capture. Wi-Fi authentication and real bus behavior have not been independently verified.
 
 These are bench-tool readings, not certified measurements. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for limits and the safety rules.
 
@@ -25,7 +26,7 @@ The full checklist lives in [TODO.md](TODO.md).
 ## Features
 
 - **Three buses at once** — UART2 RS232, UART1 RS485 and TWAI CAN sampled by one acquisition task into a 128-record ring history.
-- **Offline dashboard** — dynamic interface cards, RX/TX view, filters, view pause/clear and CSV export with spreadsheet-formula neutralization; works on the AP without Internet.
+- **Offline dashboard** — dynamic interface cards, RX/TX view, filters, view pause/clear and CSV export with spreadsheet-formula neutralization; works on the AP without Internet. Autoscroll follows new records, stops when you scroll up, and resumes using the checkbox.
 - **Speed probing** — serial pulse-timing estimate (confirmation required, never auto-applied) plus listen-only CAN search over 500/250/125/1000 kbit/s.
 - **Armed sending only** — TX disabled at boot, explicit arm with confirm dialog, 60 s idle auto-disarm, fail-closed on partial enable, no automatic resends.
 - **Device profiles** — `web/systems.json` presets fill send fields and speeds; loading a profile never arms TX and never sends.

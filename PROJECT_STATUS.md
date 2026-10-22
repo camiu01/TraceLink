@@ -1,5 +1,17 @@
 # TraceLink: status and next steps
 
+## Verified update: 22 October 2026 (Windows)
+
+- Dashboard autoscroll added: follows new records by default, stops when scrolling up, and resumes with the checkbox. Verified in an isolated browser with mocked API traffic (follow, suspension, reading-position retention, resume, pause/resume, clear). JavaScript syntax, native C++ tests, and firmware build passed (flash: 819,229 bytes). This change has not been uploaded. Baud scanning is unchanged: the user has not yet tried the manual scan button.
+- Subsequent user-requested rebuild/upload with the updated configuration also passed on COM7 (flash: 818,589 bytes). Serial boot again reported RX-only and the access point; Wi-Fi authentication was not tested.
+- User confirmed ESP32-WROOM-32 / classic DevKit, the documented 3.3 V RS232/RS485 wiring, UART0 free, and external bus devices disconnected before upload.
+- PlatformIO Core 6.1.19: firmware build passed with `espressif32@6.10.0` and Arduino 2.0.17. RAM: 65,656 bytes (20.0%); flash: 818,605 bytes (62.5%).
+- Upload on COM7 passed, including flash hash verification. Detected chip: ESP32-D0WD-V3, revision 3.1. No full erase or eFuse changes.
+- A bounded 115200-baud serial capture verified boot, `RX only al boot`, and the reported access point `TraceLink-ESP32` at `http://192.168.4.1`. TX was not enabled.
+- Initial build was blocked by a full C: drive; after the user freed space, build and upload succeeded.
+- Wi-Fi connection and real bus RX/TX remain independently unverified. The user subsequently reported working capture. Native and simulated-browser checks for the newer autoscroll change are listed above.
+- This update supersedes the older no-upload/no-detected-board statements below. No build or monitor process was left running.
+
 Updated on 6 October 2026. Programming resumed at the user's request: firmware build succeeds, upload and hardware tests still require authorization. No ESP32 was detected on this host USB (no `ttyUSB`/`ttyACM`/`serial/by-id`, no serial bridge in `lsusb`).
 
 ## Goal
