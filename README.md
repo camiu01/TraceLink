@@ -1,114 +1,243 @@
-# TRACELINK
+# TraceLink
 
-**Multi-bus passive monitor for ESP32: RS232, RS485 and classic CAN capture with an offline web dashboard and explicitly-armed transmission.**
+TraceLink is a multi-bus monitor firmware for the classic ESP32 (ESP32-WROOM-32) that listens to RS232, RS485, and classic CAN at the same time and shows the captured traffic on a USB serial log and on a self-hosted web dashboard. It is built with PlatformIO and the Arduino framework.
 
-TraceLink receives RS232 on UART2, RS485 on UART1 and classic CAN on the built-in TWAI controller at the same time. It shows traffic and loss counters on the USB monitor and on a page served by the ESP32 access point, with no Internet and no external web dependencies. Transmission stays disabled at boot and requires explicit arming with automatic disarm 60 seconds after the last send.
+It is a bench tool for people who need to observe traffic between industrial or embedded devices, estimate unknown line speeds, and occasionally send a command by hand. Transmission is disabled at boot and always requires explicit arming; the board starts in receive-only mode.
 
-## What's new on 2026-10-22
+Current scope: one RS232 direction on UART2, one RS485 port on UART1, and one classic CAN bus on the built-in TWAI controller. History lives in RAM (128 records) and nothing is persisted across reboots.
 
-Build is green after the user lifted the pause and authorized firmware work:
+[What it does](#what-it-does) · [Hardware](#hardware) · [Wiring](#wiring-and-board-configuration) · [Build and flash](#build-and-flash) · [Everyday use](#controls-and-everyday-use) · [Configuration](#configuration) · [Architecture](#firmware-architecture) · [Limitations](#limitations-and-troubleshooting) · [Development](#development) · [License](#credits-and-license)
 
-- **Firmware compiles:** latest PlatformIO build passed (RAM 20.0%, Flash 62.5%); `web_page.h` regenerates from `web/` on every build.
-- **Dashboard autoscroll:** follows new traffic, stops when scrolling up, and resumes with the checkbox. Browser checks with simulated APIs, native C++ tests, and JavaScript syntax checks passed. This dashboard update has not yet been uploaded.
-- **Arduino C++11 fixes:** `BusHealth` constructor replaces brace init rejected under `gnu++11`; explicit `twai_general_config_t` / `twai_timing_config_t` / `twai_filter_config_t` replace `auto` on TWAI macros.
-- **Validated wiring map:** isolated auto-direction RS485 module (`TX -> GPIO26`, `RX <- GPIO27`, GPIO25 unconnected) and SP3232 RS232 module (crossed `TXD -> GPIO16`, `RXD <- GPIO17`) at 3.3 V; UART0 stays free for USB flash and monitor.
-- **English documentation:** README, project status and agent instructions translated; Doxygen file/function headers plus JSDoc on the dashboard; tabs for indentation.
-- **Hardware bring-up:** previous firmware uploaded successfully on COM7; serial boot reported RX-only and the access point. The user reports working capture. Wi-Fi authentication and real bus behavior have not been independently verified.
+## See it in action
 
-These are bench-tool readings, not certified measurements. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for limits and the safety rules.
-
-## Previously: TX-capable monitor
-
-The first sketch was RX-only. The current firmware keeps RX-only at boot but adds web-driven transmission behind explicit arming: `POST /api/control` with HEX/text/CAN-ID validation, per-bus adapters owned by the acquisition task, single-shot CAN queueing with no delivery claim, and listen-only CAN whenever TX is off.
-
-The full checklist lives in [TODO.md](TODO.md).
-
-## Features
-
-- **Three buses at once** — UART2 RS232, UART1 RS485 and TWAI CAN sampled by one acquisition task into a 128-record ring history.
-- **Offline dashboard** — dynamic interface cards, RX/TX view, filters, view pause/clear and CSV export with spreadsheet-formula neutralization; works on the AP without Internet. Autoscroll follows new records, stops when you scroll up, and resumes using the checkbox.
-- **Speed probing** — serial pulse-timing estimate (confirmation required, never auto-applied) plus listen-only CAN search over 500/250/125/1000 kbit/s.
-- **Armed sending only** — TX disabled at boot, explicit arm with confirm dialog, 60 s idle auto-disarm, fail-closed on partial enable, no automatic resends.
-- **Device profiles** — `web/systems.json` presets fill send fields and speeds; loading a profile never arms TX and never sends.
-- **Loss accounting** — history evictions, CAN missed/overrun/error counters and browser-side gap counts surfaced in the UI and API.
-- **USB mirror** — `#seq ms SOURCE RX/TX` log with HEX plus CAN id/flags/DLC at 115200 baud.
-- **Embedded assets** — `scripts/embed_web.py` packs HTML and profiles into flash; no SPIFFS/LittleFS upload step.
-
-## Bus engine
-
-TraceLink keeps hardware-dependent code behind one adapter contract:
-
-| Module | Key role |
-|---|---|
-| `bus_interface.h`, `bus_interface.cpp` | `BusInterface` contract; `UartBus` (UART + optional DE/RE) and `CanBus` (TWAI listen-only/normal) |
-| `capture.h` | `Capture` record, `Source` names, `CaptureHistory` ring, `formatHex` |
-| `commands.h` | Strict HEX parser, overflow-checked numbers, rate tables, `estimateBaud` pulse histogram |
-| `TraceLink.cpp` | Task registry, speed scan, TX arm/timeout state machine, `/api/events` + `/api/control` |
-| `web/index.html` | Polling, dynamic cards, send form, CSV export (text-only rendering of bus bytes) |
-| `web/systems.json` | Example device profile (adapt to a real documented protocol) |
-| `scripts/embed_web.py` | Build-time `web_page.h` generation with profile validation |
-
-## Wiring
-
-UART0 (GPIO1/GPIO3) must stay free for USB flashing and the monitor. Power both TTL sides at 3.3 V, never 5 V: ESP32 GPIOs are not 5 V tolerant.
-
-| ESP32 | RS232 SP3232 module (TTL side) | RS485 isolated module (TTL side) |
-|---|---|---|
-| 3V3 | VCC | VIN |
-| GND | GND | GND (TTL side only) |
-| GPIO16 / RX2 | Module TXD | — |
-| GPIO17 / TX2 | Module RXD (optional if RX-only) | — |
-| GPIO26 / UART1 RX | — | Module TX |
-| GPIO27 / UART1 TX | — | Module RX |
-| GPIO25 | — | Unconnected (auto-direction module) |
-
-Bus sides (leave disconnected until the USB-only first boot passes): RS232 device TX to module RXD plus signal ground; RS485 A/B twisted pair with the earth terminal floating and 120 Ω only at the line ends; CANH/CANL to an SN65HVD230-style 3.3 V module (GPIO32 TX, GPIO33 RX) on a bus with two active nodes. The B0505XT-1WR3 DC/DC is not needed: the RS485 module already integrates isolation.
-
-Conventions: tabs, single quotes, semicolons, Doxygen `@file`+`@brief` headers and JSDoc on functions, firmware files <400 lines, functions <50 lines (`src/TraceLink.cpp` split still pending, see TODO).
-
-## Run it
-
-Prerequisites: PlatformIO (`.venv` in the project), a data USB cable, and `include/local_config.h` with your own AP password (8-63 chars, see README history note in TODO):
-
-```bash
-.venv/bin/pio run
-.venv/bin/pio run --target upload   # only on the identified board port, wiring confirmed
-.venv/bin/pio device monitor --baud 115200
-```
-
-Checks:
-
-```bash
-g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/native/history_test.cpp -o /tmp/tracelink-history-test
-/tmp/tracelink-history-test
-```
-
-Connect to `TraceLink-ESP32`, open `http://192.168.4.1`, and keep the connection when the OS warns there is no Internet. First boot is USB-only with transceivers detached; enable TX only after confirming wiring, speed and the exact command with the device owner.
-
-## Structure
+Real boot output captured from the serial monitor (115200 baud) after flashing an ESP32-D0WD-V3 over USB on 22 October 2026:
 
 ```text
-include/
-  config.h                       # build settings, GPIO map, TX window
-  capture.h                      # records, sources, ring history, HEX
-  commands.h                     # parsers, rate tables, baud estimate
-  bus_interface.h                # BusInterface contract, UartBus, CanBus
-src/
-  TraceLink.cpp                  # tasks, scan, HTTP API (split pending)
-  bus_interface.cpp              # UART/RS485 + TWAI drivers
-web/
-  index.html                     # offline dashboard (no external deps)
-  systems.json                   # example device profile
-scripts/
-  embed_web.py                   # packs web/ into web_page.h
-test/
-  native/history_test.cpp        # host-side unit checks, no board needed
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+...
+TraceLink | RX only al boot | TX da abilitare esplicitamente
+Wi-Fi: TraceLink-ESP32 | http://192.168.4.1
 ```
 
-## Safety
+This shows the firmware booting, starting in receive-only mode, and announcing its Wi-Fi access point. Firmware status messages are currently in Italian. No dashboard screenshots or device photographs exist in the repository yet.
 
-Do not infer wiring from the USB port. Identify board and port, ask what hangs on every GPIO, and get explicit upload authorization before flashing: no full erase, no eFuse, no overclock. Automated tests stay in receive mode; CAN normal mode ACKs even without user commands. Local HTTP plus the Wi-Fi password is not industrial protection.
+## What it does
 
-## License
+| Feature | Observable behavior |
+| --- | --- |
+| Three-bus capture | RS232 (UART2), RS485 (UART1), and classic CAN (TWAI) traffic is collected by one acquisition task into a shared history with sequence numbers, timestamps, and per-bus counters. |
+| Offline web dashboard | The ESP32 serves a page at `http://192.168.4.1` on its own access point, with no Internet and no external web dependencies. Shows live records, counters, loss warnings, filters, pause, autoscroll, and CSV export. The interface is bilingual (Italian/English) with a header toggle; the choice persists in the browser and the default follows the browser language. Status messages coming from the firmware remain in Italian. |
+| USB serial mirror | Every captured record is also printed on the USB monitor at 115200 baud as `#seq ms SOURCE RX/TX` plus HEX data, with CAN id/flags/DLC. |
+| Speed probing | On request, the firmware listens for a few seconds: serial baud is estimated from RX pulse timing (an estimate that requires manual confirmation, never auto-applied), and CAN is searched listen-only over 500/250/125/1000 kbit/s. |
+| Manually armed transmission | Sending from the dashboard requires explicit arming, auto-disarms after 60 s of inactivity, fails closed on partial errors, and never resends automatically after an error. CAN sending is single-shot. |
+| Device profiles | `web/systems.json` presets fill the send form and speed fields; loading a profile never arms TX and never sends. |
+| Loss accounting | History overwrites, CAN missed/overrun/error counters, and browser-side gap counts are surfaced on the dashboard and in the API. |
 
-Maintained by **Camiu** ([@camiu01](https://github.com/camiu01)). No license file yet — add one before any public release.
+### Available in the source
+
+All features above are implemented in the current source tree. Implementation does not by itself establish correctness on every device or physical validation: see verification status below.
+
+### Experimental and incompletely validated
+
+- Serial baud estimation is a pulse-timing heuristic. It can pick the wrong rate depending on data patterns and it requires at least ~20 edges of real traffic. It never changes the configured speed by itself.
+- Real-bus capture was reported working by the user on RS232; RS485 and CAN have not been exercised on hardware. Wi-Fi authentication and full dashboard behavior have not been independently verified.
+
+### Planned or deferred
+
+Open work is tracked in [TODO.md](TODO.md): web page verification on simulated APIs, safety and modularity audit, splitting `src/TraceLink.cpp` (currently over the project's 400-line file limit), replacing the example profile with documented device commands, and adding a license file.
+
+## Hardware
+
+| Component | Verified model or specification | Required / optional | Function |
+| --- | --- | --- | --- |
+| MCU board | ESP32-WROOM-32 DevKit; flashed and identified as ESP32-D0WD-V3 rev 3.1 | Required | Runs the firmware; USB port used for flashing and the monitor |
+| RS232 converter | SP3232-class TTL/RS232 module, powered at 3.3 V | Optional (needed for RS232) | Level conversion between RS232 lines and ESP32 GPIOs |
+| RS485 converter | Isolated auto-direction TTL/RS485 module, powered at 3.3 V | Optional (needed for RS485) | Level conversion and isolation for the RS485 pair |
+| CAN transceiver | SN65HVD230-class 3.3 V module | Optional (needed for CAN) | Physical layer for the built-in TWAI controller |
+| USB data cable | Connected to the board UART0 bridge (observed as a Silicon Labs CP210x on the host) | Required | Flashing and 115200 baud monitor |
+
+ESP32 GPIOs are 3.3 V only and are not 5 V tolerant. Never connect RS232, RS485, or CAN signals directly to GPIOs; always go through the transceiver modules.
+
+## Wiring and board configuration
+
+The firmware expects this fixed map (`include/config.h`). UART0 (GPIO1/GPIO3) must stay free for USB flashing and the monitor.
+
+| ESP32 | RS232 module (TTL side) | RS485 module (TTL side) | CAN module |
+| --- | --- | --- | --- |
+| 3V3 | VCC | VIN | VCC |
+| GND | GND | GND (TTL side only) | GND |
+| GPIO16 / RX2 | Module TXD | — | — |
+| GPIO17 / TX2 | Module RXD | — | — |
+| GPIO26 / UART1 RX | — | Module TX | — |
+| GPIO27 / UART1 TX | — | Module RX | — |
+| GPIO25 | — | Leave unconnected (auto-direction module) | — |
+| GPIO32 | — | — | Transceiver TXD |
+| GPIO33 | — | — | Transceiver RXD |
+
+External bus-side notes, verified against the modules on hand:
+
+- RS232: connect only the device line to be observed to the module RXD input, in parallel with the existing wiring; leave the module's RS232-side TX output unconnected for passive listening. RS232 levels must never reach a GPIO.
+- RS485: A/B twisted pair; the earth terminal stays floating; the module already integrates isolation, so no extra DC/DC converter is needed.
+- CAN: attach CANH/CANL on a bus with at least two active nodes and correct termination.
+
+For first power-up after flashing, prefer a board connected via USB only, with bus wiring detached. Electrical compatibility between the monitored equipment ground and the board ground must be confirmed before joining them; when in doubt, use isolated receivers.
+
+## Build and flash
+
+Prerequisites: PlatformIO Core (verified with 6.1.19), Python 3, a data USB cable, and a host that sees the board's serial port.
+
+1. Clone the repository and enter it:
+
+   ```sh
+   git clone https://github.com/camiu01/TraceLink.git
+   cd TraceLink
+   ```
+
+2. (Recommended) Override the public fallback Wi-Fi password by creating `include/local_config.h` (git-ignored):
+
+   ```c
+   #pragma once
+   #define TRACELINK_AP_PASSWORD "your-own-password"   // 8 to 63 characters
+   ```
+
+3. Build (this also regenerates the embedded web assets via `scripts/embed_web.py`):
+
+   ```sh
+   pio run
+   ```
+
+4. Identify the board's serial port (Windows example: Device Manager; the board appeared as `Silicon Labs CP210x USB to UART Bridge`). Do not flash to an automatically selected port without identifying it first.
+
+5. Flash — this overwrites the firmware on the board:
+
+   ```sh
+   pio run --target upload --upload-port COM7   # replace COM7 with your port
+   ```
+
+6. Open the monitor:
+
+   ```sh
+   pio device monitor --baud 115200
+   ```
+
+7. First-use check: the boot log shows the receive-only banner and the access point line. Then connect a device to the `TraceLink-ESP32` network, keep the connection when the OS warns there is no Internet, and open `http://192.168.4.1`.
+
+## Controls and everyday use
+
+Main workflow: flash and boot → connect to the `TraceLink-ESP32` access point → open `http://192.168.4.1` → watch captured traffic appear in the table → optionally probe speeds → optionally arm TX and send one command at a time.
+
+| Action | Result |
+| --- | --- |
+| Wait for traffic | Records appear in the table with sequence, ESP32 timestamp, bus/direction, HEX, and ASCII preview; per-bus counters update on the cards. Autoscroll follows new records and stops when you scroll up. |
+| Pick an interface filter | Only records from that bus are shown. |
+| Pausa vista / clear | Freezes or clears the browser view; capture on the device continues. |
+| Esporta CSV | Downloads a `;`-separated CSV of the visible records with spreadsheet-formula neutralization. |
+| Controlla velocità | Starts a passive listen (~3 s serial sampling plus CAN search). Serial results are shown as estimates to confirm by hand; a detected CAN rate is applied. Nothing is detected on a silent line. |
+| Applica (speed selector on a card) | Changes that bus speed until the next reboot; not persistent. |
+| Abilita trasmissione | Arms TX after a confirmation dialog. CAN switches to normal mode and sends ACKs on the bus. Auto-disarms 60 s after the last send. |
+| Load a profile, fill the form, Invia una volta | Sends exactly one command (HEX or text on serial; id/flags/DLC on CAN), provided TX is armed. A queued CAN frame is not proof of delivery. |
+
+Minimal end-to-end example (illustrative): on the dashboard select the RS232 card speed `9600`, arm TX, choose HEX, enter `01 03 00 00 00 02 C4 0B`, press **Invia una volta**. The send appears as a `TX` row. Whether the device answers depends entirely on its protocol; TraceLink does not compute checksums or decode application protocols.
+
+Disconnected state: if the ESP32 is unreachable, the dashboard shows a connection error and retries automatically.
+
+## Configuration
+
+There is no runtime settings store. Behavior is configured at compile time and overridden locally; the web page can only change bus speeds until the next reboot.
+
+### Compile-time configuration
+
+All options live in `include/config.h`; changing them requires a rebuild and reflash.
+
+| Option | Available configuration |
+| --- | --- |
+| `config::apSsid` | Access point name, default `TraceLink-ESP32`. |
+| `TRACELINK_AP_PASSWORD` | AP password, 8–63 characters. Fallback is a public placeholder defined in `config.h`; override it in `include/local_config.h` (excluded from Git). A `static_assert` rejects out-of-range lengths at build time. |
+| `config::rs232Baud`, `config::rs485Baud` | Initial serial speeds, default 9600 baud, format fixed to 8N1 (`config::serialFormat`). |
+| `config::canBitrate` | Initial CAN speed, default 500 kbit/s; one of 125000, 250000, 500000, 1000000. |
+| `config::rs232Rx/rs232Tx`, `rs485Rx/rs485Tx/rs485De`, `canTx/canRx` | GPIO map; see the wiring table. GPIO25 (DE/RE) is for non-auto-direction RS485 modules and stays LOW outside armed sends. |
+| `config::historyCapacity` | 128 records in RAM. |
+| `config::apiBatchSize` | 32 events per `/api/events` response. |
+| `config::uartRxBufferSize` | 2048 bytes per UART. |
+| `config::transmitWindowMs` | 60000 ms idle auto-disarm for TX. |
+
+### Runtime configuration (dashboard)
+
+Bus speeds can be changed per card and apply immediately until reboot. Values outside the supported rate tables are rejected by the firmware. Nothing else is configurable at runtime.
+
+## Firmware architecture
+
+Paths are relative to the repository root.
+
+| Module | Responsibility |
+| --- | --- |
+| `include/config.h` | Compile-time settings and GPIO map; optional `local_config.h` override. |
+| `include/capture.h` | `Capture` record, `Source` names, `CaptureHistory` ring buffer, HEX formatting. |
+| `include/commands.h` | Strict HEX parser, overflow-checked number parser, supported rate tables, baud estimation from pulse histograms. Hardware-independent and host-testable. |
+| `include/bus_interface.h` | `BusInterface` adapter contract plus `UartBus` and `CanBus` declarations. |
+| `src/bus_interface.cpp` | UART/RS485 driver (optional DE/RE) and TWAI CAN driver (listen-only vs normal mode, single-shot TX, health counters). |
+| `src/TraceLink.cpp` | FreeRTOS tasks, adapter registry, speed-scan state machine, TX arm/timeout logic, HTTP API. |
+| `web/index.html` | Offline dashboard: polling, cards, filters, send form, CSV export. Bus bytes are rendered as text only. |
+| `web/systems.json` | Device/command profiles, validated at build time. |
+| `scripts/embed_web.py` | PlatformIO pre-script that packs the dashboard and profiles into a generated `web_page.h`; no filesystem upload is needed. |
+| `test/native/history_test.cpp` | Host-side unit tests, no board required. |
+
+Execution flow: `setup()` starts serial, the three bus adapters, the Wi-Fi access point, and the HTTP server, then creates two FreeRTOS tasks. The acquisition task (priority 2) owns the bus adapters exclusively — it polls each bus, pushes records into the shared history, advances the speed scan, and executes queued commands. The USB task (priority 1) drains the same history to the serial monitor. The Arduino `loop()` only serves HTTP clients. A single mutex protects the history and the status block; HTTP handlers validate requests and enqueue them for the acquisition task, they never touch the buses directly. Pulse sampling for baud estimation runs in a GPIO interrupt handler that only fills histogram bins.
+
+Details: [docs/architecture.md](docs/architecture.md) · HTTP API: [docs/api.md](docs/api.md)
+
+## Limitations and troubleshooting
+
+| Symptom / limitation | Checks and boundary |
+| --- | --- |
+| Speed scan finds nothing | Detection needs traffic on the line. A silent line cannot be identified. Serial result is a timing estimate, not a guaranteed baud/parity/protocol match (format is fixed 8N1, no parity scan). |
+| Records or CAN frames lost | History holds only 128 records in RAM and overwrites the oldest; the dashboard reports overwrites and browser-side gaps. CAN missed/overrun/error counters come from the TWAI driver. UART overflows are not counted. Speed changes, scanning, and sending can disturb simultaneous acquisition. |
+| CAN during probing | The driver is reconfigured for about 1.2 s per candidate rate (500/250/125/1000 kbit/s); frames can be lost and counters restart. Without results the initial speed is restored. |
+| CAN FD | Not supported; classic CAN only. |
+| A sent CAN frame is not confirmed | `twai_transmit()` success means the frame was queued (single-shot), not that a recipient acknowledged it. In normal mode the node still sends ACKs for other frames. |
+| Dashboard unreachable | Confirm you are on the `TraceLink-ESP32` network and kept the connection despite the no-Internet warning; the page is only served at `http://192.168.4.1`. |
+| Control request rejected | 403 means the page's boot token is stale (reload after an ESP32 reboot); 409 means TX is armed/disarmed incorrectly for the action or another operation is running; 400 means invalid payload, rate, or CAN fields. |
+| Serial payload limits | HEX up to 64 bytes per send (8 for CAN); text 1–64 UTF-8 bytes; firmware enforces these limits too. |
+| Not a security boundary | Local HTTP plus the Wi-Fi password protects against accidents, not attackers; there is no TLS and no per-user authentication. Do not use it on sensitive or production equipment. |
+
+Hardware verification status, known issues, and resume points are maintained in [PROJECT_STATUS.md](PROJECT_STATUS.md) and [TODO.md](TODO.md).
+
+## Development
+
+Toolchain: PlatformIO Core with platform `espressif32@6.10.0`, board `esp32dev`, Arduino framework 2.0.17. Build flags: `-Wall -Wextra`. There is no CI workflow in the repository.
+
+```sh
+pio run                     # firmware build (also regenerates web_page.h)
+pio run --target upload     # flash, after identifying the port
+pio device monitor --baud 115200
+```
+
+Host-side tests (no board needed), run from the repository root:
+
+```sh
+g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/native/history_test.cpp -o tracelink-history-test
+./tracelink-history-test    # Windows: tracelink-history-test.exe
+```
+
+These cover the ring history, HEX formatting, parsers, rate tables, and baud estimation. They are unit tests of hardware-independent logic; they say nothing about physical bus behavior. For web changes, the inline script is also checked with `node --check`, and dashboard behavior has been exercised in a browser against mocked API responses.
+
+Conventions: tabs for indentation, Doxygen `@file`/`@brief` headers, JSDoc on dashboard functions, firmware files under 400 lines and functions under 50 executable lines, Conventional Commits in English, no committed secrets, no push without an explicit request. Agent-facing rules live in [agent.md](agent.md).
+
+| Guide | Contents |
+| --- | --- |
+| [docs/README.md](docs/README.md) | Documentation index and reading paths |
+| [docs/usage.md](docs/usage.md) | Dashboard workflow and HTTP API usage examples |
+| [docs/architecture.md](docs/architecture.md) | Tasks, state ownership, buffers, scan and TX state machines |
+| [docs/api.md](docs/api.md) | `/api/events`, `/api/systems`, `/api/control` reference |
+| [docs/hardware.md](docs/hardware.md) | Boards, modules, wiring, electrical boundaries, validation status |
+| [docs/testing.md](docs/testing.md) | Test commands, coverage, and what remains unverified |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Observed issues and diagnostics |
+| [PROJECT_STATUS.md](PROJECT_STATUS.md) | Verification status, limits, and resume point for maintainers |
+| [TODO.md](TODO.md) | Done/pending work and milestones |
+| [CHANGELOG.md](CHANGELOG.md) | Dated history of notable changes |
+
+## Credits and license
+
+Maintained by **Camiu** ([@camiu01](https://github.com/camiu01)). Built on the Arduino ESP32 core and the ESP-IDF TWAI driver, via PlatformIO.
+
+TraceLink is released under the GNU General Public License v3.0; see [LICENSE](LICENSE).

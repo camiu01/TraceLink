@@ -62,6 +62,7 @@
     #empty strong { display:block; font-size:20px; margin-bottom:12px; }
     #notice { margin:16px 0; color:var(--error); min-height:24px; }
     footer { display:flex; flex-wrap:wrap; justify-content:space-between; gap:16px; margin-top:24px; color:var(--muted); font-size:12px; line-height:1.6; }
+    .header-tools { display:flex; align-items:center; gap:12px; }
     [hidden] { display:none !important; }
     @media(max-width:640px) { main { padding:24px 16px; } header { align-items:flex-start; flex-direction:column; } .cards,.form-grid { grid-template-columns:1fr; } .card,.control { padding:16px; } .value { font-size:24px; } #summary { margin-left:0; width:100%; } }
   </style>
@@ -69,66 +70,165 @@
 <body>
 <main>
   <header>
-    <div><p class="eyebrow">ESP32 / monitor multi-interfaccia</p><h1>Trace<span>Link</span></h1><p>Osserva il traffico. Invia solo quando lo decidi.</p></div>
-    <div id="connection" role="status" data-state="loading">Connessione…</div>
+    <div><p class="eyebrow" data-i18n="eyebrow">ESP32 / monitor multi-interfaccia</p><h1>Trace<span>Link</span></h1><p data-i18n="tagline">Osserva il traffico. Invia solo quando lo decidi.</p></div>
+    <div class="header-tools"><button id="lang-toggle" type="button" aria-label="Language / Lingua">EN</button><div id="connection" role="status" data-state="loading">Connessione…</div></div>
   </header>
   <section id="cards" class="cards" aria-label="Contatori delle interfacce"></section>
   <section class="control" aria-labelledby="control-heading">
-    <h2 id="control-heading">Velocità e comandi</h2>
-    <p>Il controllo ascolta per circa 5 secondi: servono dati sulle linee. Le stime seriali vanno confermate; la velocità CAN rilevata viene applicata.</p>
-    <div class="tools"><button id="scan">Controlla velocità</button><button id="arm" class="danger">Abilita trasmissione</button><span id="tx-state">TX disabilitata al boot</span></div>
-    <p id="scan-results" style="margin-top:16px" role="status">Nessun controllo eseguito.</p>
+    <h2 id="control-heading" data-i18n="controlHeading">Velocità e comandi</h2>
+    <p data-i18n="scanHelp">Il controllo ascolta per circa 5 secondi: servono dati sulle linee. Le stime seriali vanno confermate; la velocità CAN rilevata viene applicata.</p>
+    <div class="tools"><button id="scan" data-i18n="scan">Controlla velocità</button><button id="arm" class="danger" data-i18n="arm">Abilita trasmissione</button><span id="tx-state" data-i18n="txBoot">TX disabilitata al boot</span></div>
+    <p id="scan-results" style="margin-top:16px" role="status" data-i18n="noScan">Nessun controllo eseguito.</p>
     <div class="tools">
-      <label for="system">Sistema</label><select id="system"><option value="">Comando libero</option></select>
-      <label for="preset">Comando salvato</label><select id="preset" disabled><option value="">Seleziona un sistema</option></select>
-      <button id="load-preset" disabled>Carica nei campi</button>
+      <label for="system" data-i18n="system">Sistema</label><select id="system"><option value="" data-i18n="freeCommand">Comando libero</option></select>
+      <label for="preset" data-i18n="preset">Comando salvato</label><select id="preset" disabled><option value="" data-i18n="selectSystem">Seleziona un sistema</option></select>
+      <button id="load-preset" disabled data-i18n="loadPreset">Carica nei campi</button>
     </div>
     <form id="send-form">
       <div class="form-grid">
-        <div class="field"><label for="send-bus">Interfaccia di invio</label><select id="send-bus" name="bus"></select></div>
-        <div class="field"><label for="encoding">Formato dati</label><select id="encoding" name="encoding"><option value="hex">HEX</option><option value="text">Testo UTF-8</option></select></div>
-        <div class="field"><label for="ending">Terminatore testo</label><select id="ending"><option value="">Nessuno</option><option value="lf">LF</option><option value="crlf">CR+LF</option></select></div>
-        <div class="field can-field" hidden><label for="can-id">ID CAN (HEX, senza 0x)</label><input id="can-id" name="id" value="123" maxlength="8"></div>
-        <div class="field can-field" hidden><label for="can-type">Formato frame CAN</label><select id="can-type" name="extended"><option value="0">Standard / 11 bit</option><option value="1">Esteso / 29 bit</option></select></div>
-        <div class="field can-field" hidden><label for="can-rtr">Tipo CAN</label><select id="can-rtr" name="rtr"><option value="0">Dati</option><option value="1">Richiesta remota (RTR)</option></select></div>
+        <div class="field"><label for="send-bus" data-i18n="sendBus">Interfaccia di invio</label><select id="send-bus" name="bus"></select></div>
+        <div class="field"><label for="encoding" data-i18n="encoding">Formato dati</label><select id="encoding" name="encoding"><option value="hex">HEX</option><option value="text" data-i18n="textUtf8">Testo UTF-8</option></select></div>
+        <div class="field"><label for="ending" data-i18n="ending">Terminatore testo</label><select id="ending"><option value="" data-i18n="none">Nessuno</option><option value="lf">LF</option><option value="crlf">CR+LF</option></select></div>
+        <div class="field can-field" hidden><label for="can-id" data-i18n="canId">ID CAN (HEX, senza 0x)</label><input id="can-id" name="id" value="123" maxlength="8"></div>
+        <div class="field can-field" hidden><label for="can-type" data-i18n="canType">Formato frame CAN</label><select id="can-type" name="extended"><option value="0">Standard / 11 bit</option><option value="1" data-i18n="extended">Esteso / 29 bit</option></select></div>
+        <div class="field can-field" hidden><label for="can-rtr" data-i18n="canKind">Tipo CAN</label><select id="can-rtr" name="rtr"><option value="0" data-i18n="dataFrame">Dati</option><option value="1" data-i18n="rtrFrame">Richiesta remota (RTR)</option></select></div>
         <div class="field" id="dlc-field" hidden><label for="can-dlc">DLC RTR</label><input id="can-dlc" name="dlc" type="number" min="0" max="8" value="0"></div>
-        <div class="field wide"><label for="payload">Comando / dati (massimo 64 byte seriali, 8 byte CAN)</label><textarea id="payload" name="data" rows="2" placeholder="Esempio HEX: 01 03 00 00 00 02 C4 0B"></textarea></div>
+        <div class="field wide"><label for="payload" data-i18n="payload">Comando / dati (massimo 64 byte seriali, 8 byte CAN)</label><textarea id="payload" name="data" rows="2" data-i18n-ph="payloadHint" placeholder="Esempio HEX: 01 03 00 00 00 02 C4 0B"></textarea></div>
       </div>
-      <div class="tools"><button id="send" type="submit" disabled>Invia una volta</button><span id="command-result" role="status">Nessun comando inviato.</span></div>
+      <div class="tools"><button id="send" type="submit" disabled data-i18n="send">Invia una volta</button><span id="command-result" role="status" data-i18n="noCommand">Nessun comando inviato.</span></div>
     </form>
   </section>
   <div class="tools">
-    <label for="filter">Interfaccia</label>
-    <select id="filter"><option value="all">Tutte le interfacce</option></select>
-    <button id="pause">Pausa vista</button>
-    <label><input id="follow" type="checkbox" checked> Scorrimento automatico</label>
-    <button id="clear">Pulisci vista</button>
-    <button id="export" class="primary">Esporta CSV</button>
-    <span id="summary">0 record in vista / massimo 500</span>
+    <label for="filter" data-i18n="interface">Interfaccia</label>
+    <select id="filter"><option value="all" data-i18n="allInterfaces">Tutte le interfacce</option></select>
+    <button id="pause" data-i18n="pause">Pausa vista</button>
+    <label><input id="follow" type="checkbox" checked> <span data-i18n="follow">Scorrimento automatico</span></label>
+    <button id="clear" data-i18n="clear">Pulisci vista</button>
+    <button id="export" class="primary" data-i18n="export">Esporta CSV</button>
+    <span id="summary">0 record</span>
   </div>
   <section class="stream" aria-labelledby="stream-heading">
-    <div class="stream-title"><h2 id="stream-heading">Traffico e invii</h2><span id="mode-tag" class="tag">RX ONLY</span></div>
+    <div class="stream-title"><h2 id="stream-heading" data-i18n="streamHeading">Traffico e invii</h2><span id="mode-tag" class="tag">RX ONLY</span></div>
     <div class="scroll" id="traffic-scroll">
-      <table id="table" hidden><thead><tr><th scope="col">#</th><th scope="col">Tempo ESP32</th><th scope="col">Bus / direzione</th><th scope="col">Frame</th><th scope="col">Dati HEX</th><th scope="col">ASCII</th></tr></thead><tbody id="rows"></tbody></table>
-      <div id="empty"><strong>In attesa di dati</strong><p>Collega un transceiver e verifica baud rate, cablaggio e massa.<br>Le porte seriali mostrano blocchi di byte, non messaggi decodificati.</p></div>
+      <table id="table" hidden><thead><tr><th scope="col">#</th><th scope="col" data-i18n="colTime">Tempo ESP32</th><th scope="col" data-i18n="colBus">Bus / direzione</th><th scope="col">Frame</th><th scope="col" data-i18n="colHex">Dati HEX</th><th scope="col">ASCII</th></tr></thead><tbody id="rows"></tbody></table>
+      <div id="empty"><strong data-i18n="emptyTitle">In attesa di dati</strong><p><span data-i18n="emptyHint1">Collega un transceiver e verifica baud rate, cablaggio e massa.</span><br><span data-i18n="emptyHint2">Le porte seriali mostrano blocchi di byte, non messaggi decodificati.</span></p></div>
     </div>
   </section>
   <p id="notice" role="status"></p>
-  <footer><span id="health">Cronologia ESP32: 128 record · Vista browser: 500 record</span><span>TX disabilitata al boot · CAN classico, non CAN FD</span></footer>
+  <footer><span id="health" data-i18n="footerHistory">Cronologia ESP32: 128 record · Vista browser: 500 record</span><span data-i18n="footerNote">TX disabilitata al boot · CAN classico, non CAN FD</span></footer>
 </main>
 <script>
 	/**
 	 * @file TraceLink local dashboard: polling, filters, TX controls, CSV export.
 	 * Bus payloads are untrusted input and are rendered as text only.
+	 * Firmware-provided status messages (data.message) arrive from the ESP32 in Italian.
 	 */
 	'use strict';
 	/** Shorthand for document.getElementById. */
 	const $ = id => document.getElementById(id);
+	/** UI strings, Italian and English. */
+	const strings = {
+		it: {
+			eyebrow: 'ESP32 / monitor multi-interfaccia', tagline: 'Osserva il traffico. Invia solo quando lo decidi.',
+			connecting: 'Connessione…', title: 'TraceLink · Monitor bus',
+			controlHeading: 'Velocità e comandi',
+			scanHelp: 'Il controllo ascolta per circa 5 secondi: servono dati sulle linee. Le stime seriali vanno confermate; la velocità CAN rilevata viene applicata.',
+			scan: 'Controlla velocità', scanning: 'Controllo in corso…', arm: 'Abilita trasmissione', disarm: 'Disabilita trasmissione',
+			txBoot: 'TX disabilitata al boot', noScan: 'Nessun controllo eseguito.',
+			system: 'Sistema', freeCommand: 'Comando libero', preset: 'Comando salvato', selectSystem: 'Seleziona un sistema', loadPreset: 'Carica nei campi',
+			sendBus: 'Interfaccia di invio', encoding: 'Formato dati', textUtf8: 'Testo UTF-8', ending: 'Terminatore testo', none: 'Nessuno',
+			canId: 'ID CAN (HEX, senza 0x)', canType: 'Formato frame CAN', extended: 'Esteso / 29 bit', canKind: 'Tipo CAN', dataFrame: 'Dati', rtrFrame: 'Richiesta remota (RTR)',
+			payload: 'Comando / dati (massimo 64 byte seriali, 8 byte CAN)', payloadHint: 'Esempio HEX: 01 03 00 00 00 02 C4 0B',
+			send: 'Invia una volta', noCommand: 'Nessun comando inviato.',
+			interface: 'Interfaccia', allInterfaces: 'Tutte le interfacce', pause: 'Pausa vista', resume: 'Riprendi vista',
+			follow: 'Scorrimento automatico', clear: 'Pulisci vista', export: 'Esporta CSV',
+			streamHeading: 'Traffico e invii', colTime: 'Tempo ESP32', colBus: 'Bus / direzione', colHex: 'Dati HEX',
+			emptyTitle: 'In attesa di dati', emptyHint1: 'Collega un transceiver e verifica baud rate, cablaggio e massa.', emptyHint2: 'Le porte seriali mostrano blocchi di byte, non messaggi decodificati.',
+			footerHistory: 'Cronologia ESP32: 128 record · Vista browser: 500 record', footerNote: 'TX disabilitata al boot · CAN classico, non CAN FD',
+			unitRecords: 'record RX/TX', unitBlocks: 'blocchi RX/TX', apply: 'Applica', speedLabel: name => `Velocità ${name}`,
+			canNormal: 'modo normale / ACK attivi', canListen: 'solo ascolto', active: 'attiva', unavailable: 'non disponibile', notDetected: 'non rilevata', applied: 'applicata',
+			summary: (visible, total) => `${visible} visibili / ${total} in memoria / massimo 500`,
+			frameBytes: n => `${n} byte`,
+			health: (uptime, overwritten, missed, overrun, errors) => `ESP32: ${uptime} s · Cronologia sovrascritta: ${overwritten} · CAN persi: ${missed}, overrun: ${overrun}, errori: ${errors}`,
+			warnLost: n => `${n} record non recuperati dal browser.`, warnCanDown: 'Driver CAN non disponibile. Controlla il monitor USB.', warnCanLoss: 'Perdita di frame nella ricezione CAN.',
+			txArmed: 'TX ABILITATA · CAN invia ACK', txOff: 'TX disabilitata · ascolto passivo', modeRxTx: 'RX + TX', modeRx: 'RX ONLY',
+			scanListening: 'Ascolto delle linee in corso…',
+			scanResult: (rs232, rs485, can) => `Stime: RS232 ${rs232} baud · RS485 ${rs485} baud · CAN ${can}.`,
+			connected: 'Connesso · acquisizione attiva', connectedPaused: 'Connesso · vista in pausa', unreachable: 'ESP32 non raggiungibile',
+			retryNotice: 'Verifica la connessione alla rete TraceLink-ESP32. Nuovo tentativo automatico.',
+			noRetry: ' Nessun reinvio automatico.', profileNoBus: 'Interfaccia del profilo non disponibile.',
+			profileLoaded: 'Profilo caricato. Applica la velocità se necessario, poi abilita TX e invia. Nessun invio automatico.',
+			armConfirm: 'Abilitare TX? CAN passerà in modo normale e invierà ACK. Verifica cablaggio, velocità e sicurezza del dispositivo prima di procedere.',
+			csvHeader: ['sequenza','tempo_ms','bus','direzione','frame','hex','ascii'], cardsLabel: 'Contatori delle interfacce'
+		},
+		en: {
+			eyebrow: 'ESP32 / multi-bus monitor', tagline: 'Watch the traffic. Send only when you decide.',
+			connecting: 'Connecting…', title: 'TraceLink · Bus monitor',
+			controlHeading: 'Speed and commands',
+			scanHelp: 'The check listens for about 5 seconds: traffic is required on the lines. Serial estimates need confirmation; a detected CAN rate is applied.',
+			scan: 'Check speed', scanning: 'Check in progress…', arm: 'Enable transmission', disarm: 'Disable transmission',
+			txBoot: 'TX disabled at boot', noScan: 'No check performed yet.',
+			system: 'System', freeCommand: 'Free command', preset: 'Saved command', selectSystem: 'Select a system', loadPreset: 'Load into fields',
+			sendBus: 'Send interface', encoding: 'Data format', textUtf8: 'UTF-8 text', ending: 'Text terminator', none: 'None',
+			canId: 'CAN ID (HEX, no 0x)', canType: 'CAN frame format', extended: 'Extended / 29 bit', canKind: 'CAN type', dataFrame: 'Data', rtrFrame: 'Remote request (RTR)',
+			payload: 'Command / data (max 64 serial bytes, 8 CAN bytes)', payloadHint: 'HEX example: 01 03 00 00 00 02 C4 0B',
+			send: 'Send once', noCommand: 'No command sent.',
+			interface: 'Interface', allInterfaces: 'All interfaces', pause: 'Pause view', resume: 'Resume view',
+			follow: 'Autoscroll', clear: 'Clear view', export: 'Export CSV',
+			streamHeading: 'Traffic and sends', colTime: 'ESP32 time', colBus: 'Bus / direction', colHex: 'HEX data',
+			emptyTitle: 'Waiting for data', emptyHint1: 'Connect a transceiver and check baud rate, wiring and ground.', emptyHint2: 'Serial ports show blocks of bytes, not decoded messages.',
+			footerHistory: 'ESP32 history: 128 records · Browser view: 500 records', footerNote: 'TX disabled at boot · classic CAN, not CAN FD',
+			unitRecords: 'RX/TX records', unitBlocks: 'RX/TX blocks', apply: 'Apply', speedLabel: name => `${name} speed`,
+			canNormal: 'normal mode / ACKs active', canListen: 'listen-only', active: 'active', unavailable: 'unavailable', notDetected: 'not detected', applied: 'applied',
+			summary: (visible, total) => `${visible} visible / ${total} in memory / max 500`,
+			frameBytes: n => `${n} byte${n === 1 ? '' : 's'}`,
+			health: (uptime, overwritten, missed, overrun, errors) => `ESP32: ${uptime} s · History overwritten: ${overwritten} · CAN missed: ${missed}, overrun: ${overrun}, errors: ${errors}`,
+			warnLost: n => `${n} records not retrieved by the browser.`, warnCanDown: 'CAN driver unavailable. Check the USB monitor.', warnCanLoss: 'Frame loss in CAN reception.',
+			txArmed: 'TX ENABLED · CAN sends ACKs', txOff: 'TX disabled · passive listening', modeRxTx: 'RX + TX', modeRx: 'RX ONLY',
+			scanListening: 'Listening on the lines…',
+			scanResult: (rs232, rs485, can) => `Estimates: RS232 ${rs232} baud · RS485 ${rs485} baud · CAN ${can}.`,
+			connected: 'Connected · capturing', connectedPaused: 'Connected · view paused', unreachable: 'ESP32 unreachable',
+			retryNotice: 'Check the connection to the TraceLink-ESP32 network. Retrying automatically.',
+			noRetry: ' No automatic retry.', profileNoBus: 'Profile interface not available.',
+			profileLoaded: 'Profile loaded. Apply the speed if needed, then enable TX and send. Nothing is sent automatically.',
+			armConfirm: 'Enable TX? CAN will switch to normal mode and send ACKs. Verify wiring, speed, and device safety before proceeding.',
+			csvHeader: ['sequence','time_ms','bus','direction','frame','hex','ascii'], cardsLabel: 'Interface counters'
+		}
+	};
+	/** Active UI language; persisted in localStorage, defaults from the browser. */
+	let lang = localStorage.getItem('tracelink-lang') || ((navigator.language || 'it').toLowerCase().startsWith('en') ? 'en' : 'it');
+	/** Looks up a UI string, falling back to Italian. */
+	const t = key => strings[lang][key] ?? strings.it[key] ?? key;
+	/** Locale tag matching the active language. */
+	const locale = () => lang === 'en' ? 'en-GB' : 'it-IT';
 	let cursor = 0, boot = null, paused = false, records = [], missed = 0;
 	let lastData = null;
 	let descriptors = [], connected = false, posting = false, systems = [];
 	const serialRates = [1200,2400,4800,9600,19200,38400,57600,115200];
 	const canRates = [125000,250000,500000,1000000];
+	/**
+	 * Applies the active language to all static markup and refreshable dynamic text.
+	 * @returns {void}
+	 */
+	function applyStrings() {
+		document.documentElement.lang = lang;
+		document.title = t('title');
+		document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+		document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+		$('lang-toggle').textContent = lang === 'it' ? 'EN' : 'IT';
+		if (connected) $('connection').textContent = paused ? t('connectedPaused') : t('connected');
+		else if ($('connection').dataset.state === 'error') $('connection').textContent = t('unreachable');
+		else $('connection').textContent = t('connecting');
+		$('pause').textContent = paused ? t('resume') : t('pause');
+		$('cards').setAttribute('aria-label', t('cardsLabel'));
+		if (descriptors.length) {
+			$('cards').dataset.key = '';
+			buildInterfaces(descriptors);
+		}
+		if (lastData) { updateStats(lastData); updateCommands(lastData); }
+		updateControlState();
+		render();
+	}
 	/**
 	 * Rebuilds interface cards and selectors when the bus set changes.
 	 * @param {Array} interfaces Bus descriptors from /api/events.
@@ -141,7 +241,7 @@
 		$('cards').dataset.key = key;
 		$('cards').replaceChildren();
 		$('send-bus').replaceChildren();
-		$('filter').replaceChildren(new Option('Tutte le interfacce','all'));
+		$('filter').replaceChildren(new Option(t('allInterfaces'),'all'));
 		interfaces.forEach((bus, index) => {
 			$('send-bus').add(new Option(bus.name, bus.name));
 			$('filter').add(new Option(bus.name, bus.name));
@@ -149,14 +249,14 @@
 			const title = document.createElement('h2'); title.textContent = `${String(index + 1).padStart(2,'0')} / ${bus.name}`;
 			const value = document.createElement('div'); value.className = 'value';
 			const count = document.createElement('span'); count.id = `count-${index}`;
-			const unit = document.createElement('span'); unit.className = 'unit'; unit.textContent = bus.protocol === 'can' ? 'record RX/TX' : 'blocchi RX/TX';
+			const unit = document.createElement('span'); unit.className = 'unit'; unit.textContent = bus.protocol === 'can' ? t('unitRecords') : t('unitBlocks');
 			value.append(count,unit);
 			const rate = document.createElement('p'); rate.id = `rate-${index}`;
 			const tools = document.createElement('div'); tools.className = 'rate-tools';
-			const select = document.createElement('select'); select.id = `speed-${index}`; select.setAttribute('aria-label',`Velocità ${bus.name}`);
+			const select = document.createElement('select'); select.id = `speed-${index}`; select.setAttribute('aria-label', t('speedLabel')(bus.name));
 			(bus.protocol === 'can' ? canRates : serialRates).forEach(speed => select.add(new Option(String(speed),String(speed))));
 			select.value = String(bus.rate);
-			const apply = document.createElement('button'); apply.textContent = 'Applica'; apply.className = 'rate-apply';
+			const apply = document.createElement('button'); apply.textContent = t('apply'); apply.className = 'rate-apply';
 			apply.addEventListener('click', () => postControl({action:'rate',bus:bus.name,rate:select.value}));
 			tools.append(select,apply); card.append(title,value,rate,tools); $('cards').append(card);
 		});
@@ -203,7 +303,7 @@
 			const result = await response.text();
 			$('command-result').textContent = result;
 			if (!response.ok) throw new Error(result);
-		} catch (error) { $('command-result').textContent = error.message + ' Nessun reinvio automatico.'; }
+		} catch (error) { $('command-result').textContent = error.message + t('noRetry'); }
 		finally { posting = false; updateControlState(); }
 	}
 	/**
@@ -231,7 +331,7 @@
 	 * @returns {string} Frame description.
 	 */
 	function frame(record) {
-		if (record.source !== 'CAN') return `${record.hex ? record.hex.split(' ').length : 0} byte`;
+		if (record.source !== 'CAN') return t('frameBytes')(record.hex ? record.hex.split(' ').length : 0);
 		return `${record.id.toString(16).toUpperCase().padStart(record.ext ? 8 : 3, '0')} / ${record.ext ? 'EXT' : 'STD'}${record.rtr ? ' RTR' : ''} / DLC ${record.dlc}`;
 	}
 	/**
@@ -256,7 +356,7 @@
 		$('rows').replaceChildren(fragment);
 		$('table').hidden = visible.length === 0;
 		$('empty').hidden = visible.length > 0;
-		$('summary').textContent = `${visible.length} visibili / ${records.length} in memoria / massimo 500`;
+		$('summary').textContent = t('summary')(visible.length, records.length);
 		viewport.scrollTop = $('follow').checked ? viewport.scrollHeight : previousTop;
 	}
 	/**
@@ -266,14 +366,14 @@
 	 */
 	function updateStats(data) {
 		data.interfaces.forEach((bus, i) => {
-			$('count-' + i).textContent = bus.count.toLocaleString('it-IT');
-			$('rate-' + i).textContent = bus.protocol === 'can' ? `${bus.rate / 1000} kbit/s · ${bus.ready ? (data.armed ? 'modo normale / ACK attivi' : 'solo ascolto') : 'non disponibile'}` : `${bus.rate.toLocaleString('it-IT')} baud · ${bus.ready ? 'attiva' : 'non disponibile'}`;
+			$('count-' + i).textContent = bus.count.toLocaleString(locale());
+			$('rate-' + i).textContent = bus.protocol === 'can' ? `${bus.rate / 1000} kbit/s · ${bus.ready ? (data.armed ? t('canNormal') : t('canListen')) : t('unavailable')}` : `${bus.rate.toLocaleString(locale())} baud · ${bus.ready ? t('active') : t('unavailable')}`;
 		});
-		$('health').textContent = `ESP32: ${Math.floor(data.uptime / 1000)} s · Cronologia sovrascritta: ${data.overwritten} · CAN persi: ${data.canMissed}, overrun: ${data.canOverrun}, errori: ${data.canErrors}`;
+		$('health').textContent = t('health')(Math.floor(data.uptime / 1000), data.overwritten, data.canMissed, data.canOverrun, data.canErrors);
 		const warnings = [];
-		if (missed) warnings.push(`${missed} record non recuperati dal browser.`);
-		if (!data.canReady) warnings.push('Driver CAN non disponibile. Controlla il monitor USB.');
-		if (data.canMissed || data.canOverrun) warnings.push('Perdita di frame nella ricezione CAN.');
+		if (missed) warnings.push(t('warnLost')(missed));
+		if (!data.canReady) warnings.push(t('warnCanDown'));
+		if (data.canMissed || data.canOverrun) warnings.push(t('warnCanLoss'));
 		$('notice').textContent = warnings.join(' ');
 	}
 	/**
@@ -282,11 +382,11 @@
 	 * @returns {void}
 	 */
 	function updateCommands(data) {
-		$('arm').textContent = data.armed ? 'Disabilita trasmissione' : 'Abilita trasmissione';
-		$('tx-state').textContent = data.armed ? 'TX ABILITATA · CAN invia ACK' : 'TX disabilitata · ascolto passivo';
-		$('mode-tag').textContent = data.armed ? 'RX + TX' : 'RX ONLY';
-		$('scan').textContent = data.scanning ? 'Controllo in corso…' : 'Controlla velocità';
-		$('scan-results').textContent = data.scanning ? 'Ascolto delle linee in corso…' : `Stime: RS232 ${data.estimates[0] || 'non rilevata'} baud · RS485 ${data.estimates[1] || 'non rilevata'} baud · CAN ${data.canDetected ? data.canDetected / 1000 + ' kbit/s (applicata)' : 'non rilevata'}.`;
+		$('arm').textContent = data.armed ? t('disarm') : t('arm');
+		$('tx-state').textContent = data.armed ? t('txArmed') : t('txOff');
+		$('mode-tag').textContent = data.armed ? t('modeRxTx') : t('modeRx');
+		$('scan').textContent = data.scanning ? t('scanning') : t('scan');
+		$('scan-results').textContent = data.scanning ? t('scanListening') : t('scanResult')(data.estimates[0] || t('notDetected'), data.estimates[1] || t('notDetected'), data.canDetected ? data.canDetected / 1000 + ' kbit/s (' + t('applied') + ')' : t('notDetected'));
 		if (!posting) $('command-result').textContent = data.message;
 		updateControlState();
 	}
@@ -319,18 +419,23 @@
 			lastData = data;
 			if (!paused) updateStats(data);
 			updateCommands(data); // Safety state must update even when the view is paused.
-			$('connection').textContent = paused ? 'Connesso · vista in pausa' : 'Connesso · acquisizione attiva';
+			$('connection').textContent = paused ? t('connectedPaused') : t('connected');
 			$('connection').dataset.state = 'ok';
 		} catch (error) {
 			connected = false; updateControlState();
-			$('connection').textContent = 'ESP32 non raggiungibile';
+			$('connection').textContent = t('unreachable');
 			$('connection').dataset.state = 'error';
-			$('notice').textContent = 'Verifica la connessione alla rete TraceLink-ESP32. Nuovo tentativo automatico.';
+			$('notice').textContent = t('retryNotice');
 			nextDelay = 1500;
 		} finally {
 			setTimeout(poll, nextDelay);
 		}
 	}
+	$('lang-toggle').addEventListener('click', () => {
+		lang = lang === 'it' ? 'en' : 'it';
+		localStorage.setItem('tracelink-lang', lang);
+		applyStrings();
+	});
 	$('filter').addEventListener('change', render);
 	$('traffic-scroll').addEventListener('scroll', () => {
 		const viewport = $('traffic-scroll');
@@ -361,7 +466,7 @@
 		const command = system?.commands[$('preset').value];
 		if (!command) return;
 		const index = descriptors.findIndex(bus => bus.name === system.bus);
-		if (index < 0) { $('command-result').textContent = 'Interfaccia del profilo non disponibile.'; return; }
+		if (index < 0) { $('command-result').textContent = t('profileNoBus'); return; }
 		$('send-bus').value = system.bus;
 		$('encoding').value = command.encoding;
 		$('ending').value = '';
@@ -372,14 +477,14 @@
 		$('can-dlc').value = String(command.dlc || 0);
 		$('speed-' + index).value = String(system.rate);
 		updateSendFields();
-		$('command-result').textContent = 'Profilo caricato. Applica la velocità se necessario, poi abilita TX e invia. Nessun invio automatico.';
+		$('command-result').textContent = t('profileLoaded');
 	});
 	$('encoding').addEventListener('change', updateSendFields);
 	$('can-rtr').addEventListener('change', updateSendFields);
 	$('scan').addEventListener('click', () => postControl({action:'scan'}));
 	$('arm').addEventListener('click', () => {
 		if (!lastData) return;
-		if (!lastData.armed && !confirm('Abilitare TX? CAN passerà in modo normale e invierà ACK. Verifica cablaggio, velocità e sicurezza del dispositivo prima di procedere.')) return;
+		if (!lastData.armed && !confirm(t('armConfirm'))) return;
 		postControl({action:lastData.armed ? 'disarm' : 'arm'});
 	});
 	$('send-form').addEventListener('submit', event => {
@@ -391,13 +496,13 @@
 	});
 	$('pause').addEventListener('click', () => {
 		paused = !paused;
-		$('pause').textContent = paused ? 'Riprendi vista' : 'Pausa vista';
+		$('pause').textContent = paused ? t('resume') : t('pause');
 		$('pause').setAttribute('aria-pressed', String(paused));
 		if (!paused) { render(); if (lastData) updateStats(lastData); }
 	});
 	$('clear').addEventListener('click', () => { records = []; render(); });
 	$('export').addEventListener('click', () => {
-		const lines = [['sequenza','tempo_ms','bus','direzione','frame','hex','ascii'], ...visibleRecords().map(record =>
+		const lines = [t('csvHeader'), ...visibleRecords().map(record =>
 			[record.seq,record.ms,record.source,record.tx ? 'TX' : 'RX',frame(record),record.hex,ascii(record.hex)])];
 		// Neutralize spreadsheet formulas derived from untrusted serial bytes.
 		const csvCell = value => {
@@ -411,6 +516,7 @@
 		link.href = url; link.download = 'TraceLink.csv'; link.click();
 		setTimeout(() => URL.revokeObjectURL(url), 1000);
 	});
+	applyStrings();
 	poll();
 </script>
 </body>

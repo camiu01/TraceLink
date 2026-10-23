@@ -1,5 +1,10 @@
 # TraceLink: status and next steps
 
+## Verified update: 23 October 2026 (Windows)
+
+- Dashboard i18n (Italian/English toggle, browser-language default, localStorage persistence) verified in a browser with mocked API traffic in both languages. JavaScript syntax check and `pio run` build passed. Not yet uploaded to the board. Firmware-side messages remain Italian.
+- Documentation standardized: README rewritten, `docs/` guides (usage, architecture, API, hardware, testing, troubleshooting), `CHANGELOG.md`, and GPLv3 `LICENSE` added. `include/config.h` carries an uncommitted local password change and stays out of version control.
+
 ## Verified update: 22 October 2026 (Windows)
 
 - Dashboard autoscroll added: follows new records by default, stops when scrolling up, and resumes with the checkbox. Verified in an isolated browser with mocked API traffic (follow, suspension, reading-position retention, resume, pause/resume, clear). JavaScript syntax, native C++ tests, and firmware build passed (flash: 819,229 bytes). This change has not been uploaded. Baud scanning is unchanged: the user has not yet tried the manual scan button.
@@ -56,7 +61,7 @@ The firmware **builds successfully** (`firmware.bin` ~805 kB, `firmware.elf` gen
 
 Wi-Fi: access point `TraceLink-ESP32`, page at `http://192.168.4.1`.
 
-The fallback password `change-this-password` is public and must be replaced before use.
+The fallback AP password in `include/config.h` is a public placeholder and must be overridden in `include/local_config.h` before use (the working tree currently carries an uncommitted local change to this file).
 
 ## Hardware on hand and pending choices
 
