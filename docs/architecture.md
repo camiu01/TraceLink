@@ -21,10 +21,13 @@ HTTP clients <--> loop()/WebServer <-------+                |
 | --- | --- | --- |
 | `acquire` task | Owns all bus adapters. Polls each bus, pushes records into the history, advances the speed scan, executes queued commands (rate change, arm/disarm, send). | 6144 bytes, priority 2 |
 | `usbOutput` task | Drains the history to the USB serial log in batches of 4 every 5 ms. | 4096 bytes, priority 1 |
-| Arduino `loop()` | Runs `server.handleClient()` with a 2 ms delay; HTTP handlers only validate and enqueue work. | Arduino default |
+| Arduino `loop()` | Polls framed USB input and HTTP, with a 2 ms delay. Both interfaces only validate and enqueue controls. | Arduino default |
 | GPIO interrupt (`sampleEdge`) | During serial baud sampling only, fills pulse-interval histogram bins. ISR work is limited to a critical-section histogram update. | ISR |
 
-One mutex (`xSemaphoreCreateMutex`) protects the history, the status block, and the pending command. Readers (`usbOutput`, HTTP handlers) take the same mutex, so a consistent snapshot is always served.
+One mutex protects history, status and the pending command. HTTP and USB snapshots
+take this mutex and release it before serialization/output. A separate USB output
+mutex serializes whole replies against capture logs; there is no blocking USB
+write while holding the acquisition-state mutex.
 
 ## Module responsibilities
 
@@ -35,7 +38,12 @@ One mutex (`xSemaphoreCreateMutex`) protects the history, the status block, and 
 | `include/commands.h` | Hardware-independent logic: strict HEX parser, overflow-checked integer parser, supported rate tables (serial 1200–115200, CAN 125k–1M), `estimateBaud` over a `PulseHistogram`. Covered by host tests. |
 | `include/bus_interface.h` | `BusInterface` contract (`begin`, `receive`, `send`, `setTransmit`, `health`, `rate`, `protocol`) plus `UartBus` and `CanBus`. |
 | `src/bus_interface.cpp` | UART/RS485 driver with optional DE/RE toggling around sends; TWAI driver with listen-only/normal mode switching, single-shot transmission, and health counters from `twai_get_status_info()`. |
-| `src/TraceLink.cpp` | Adapter registry, acquisition and USB tasks, speed-scan state machine, TX arm/timeout logic, HTTP API, JSON rendering. |
+| `src/TraceLink.cpp` | Adapter registry, acquisition task, speed-scan state machine, TX arm/timeout logic and setup. |
+| `include/control_request.h` | Shared command types, field validation and state admission rules for HTTP and USB. |
+| `include/usb_protocol.h` | Bounded line buffer, CRC32, cursor and URL-form parsing, with native tests. |
+| `include/runtime.h` | Acquisition-state declarations and shared API/USB entry points. |
+| `src/api.cpp` | JSON snapshots, token validation, common control admission/queue and HTTP routes. |
+| `src/usb_console.cpp` | Framed USB API and human-readable capture mirror with serialized output. |
 | `web/index.html` | Dashboard: 250 ms polling of `/api/events`, interface cards built from API descriptors, filters, pause/autoscroll, CSV export, send form. All bus bytes are rendered as text, never as HTML. |
 | `web/systems.json` | Device profiles; schema validated at build time by the embed script. |
 | `scripts/embed_web.py` | PlatformIO `pre:` script that packs `web/` into a generated `web_page.h` (raw string + JSON), so no filesystem image is needed. |
@@ -62,8 +70,8 @@ TX is disabled at boot. `arm` calls `setTransmit(true)` on every adapter; if any
 
 ## Initialization and failure handling
 
-Setup order: USB serial, boot token (`esp_random`), mutex, bus adapters, Wi-Fi AP, HTTP routes, tasks. Failure to create the mutex or the acquisition task halts the board with a message on the serial log. A failed Wi-Fi AP start is logged and the board continues with USB-only output. CAN driver install/start failures are logged with the ESP-IDF error name and reported as `non disponibile` in the API.
+Setup order: USB serial, boot token (`esp_random`), state/output mutexes, bus adapters, Wi-Fi AP, HTTP routes, tasks. Failure to create either mutex or the acquisition task halts the board with a serial message. A failed Wi-Fi AP start is logged; USB capture and the framed USB API remain available. CAN driver failures remain visible in the API.
 
 ## HTTP layer
 
-Handlers live in `src/TraceLink.cpp`. `POST /api/control` validates the `X-TraceLink` boot token header (no CORS is enabled), parses and bounds-checks every field, rejects conflicting states with 409, and enqueues the command for the acquisition task, answering 202. The actual outcome appears in the next `/api/events` poll as the `message` field. See [api.md](api.md) for the full reference.
+Handlers live in `src/api.cpp`. `POST /api/control` validates the `X-TraceLink` boot token header (no CORS is enabled), parses and bounds-checks every field, rejects conflicting states with 409, and enqueues the command for the acquisition task, answering 202. The actual outcome appears in the next `/api/events` poll as the `message` field. USB uses the same snapshot, parser, token check and queue through `submitControl()`. See [api.md](api.md) for both wire formats.

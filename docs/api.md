@@ -54,6 +54,7 @@ Field notes:
 ## POST /api/control
 
 Form-encoded (`application/x-www-form-urlencoded`). Requires the `X-TraceLink: <boot>` header; a missing or stale token yields HTTP 403 and the fix is reloading the page. No CORS headers are sent.
+Embedded NUL bytes in form fields are rejected; use HEX `00` for a binary NUL payload.
 
 | Parameter | Values |
 | --- | --- |
@@ -74,3 +75,52 @@ Responses are `text/plain`:
 - `409` — conflicting state: scanning while armed, arming/sending during a scan, sending while disarmed, or another command in progress.
 
 Behavioral guarantees: commands execute exactly once, never retry automatically, and sending requires a prior `arm`. `arm` puts CAN in normal mode (the node sends ACKs); `disarm` returns it to listen-only. CAN sends are single-shot, so a queued frame is not retransmitted and its queuing is not a delivery confirmation.
+
+## USB serial API (TL1)
+
+The updated firmware also accepts framed requests on the board USB/UART0
+connection at **115200 baud, 8N1**. Human-readable capture logs remain enabled.
+The host must own the port exclusively. See [MCP USB setup](mcp.md#connect-the-esp32-through-usb--com).
+
+Request format, with LF termination:
+
+```text
+TL1 <16-hex-request-id> events <after> *<8-hex-crc32>
+TL1 <16-hex-request-id> control <boot> <form-encoded-fields> *<8-hex-crc32>
+```
+
+CRC32 is IEEE/zlib CRC32 over every byte before the space and `*` trailer, including
+`TL1`, the request ID and payload. Frames use printable ASCII only; URL-encode
+control data, including newlines and UTF-8 bytes. For example, this independent
+read-only test vector has a valid checksum:
+
+```text
+TL1 0123456789abcdef events 0 *18aab641
+```
+
+Responses are complete CRLF-terminated lines, serialized against the USB log:
+
+```text
+TL1 <request-id> 200 <the same JSON snapshot as GET /api/events>
+TL1 <request-id> 202 <control queued, not executed or delivered>
+TL1 <request-id> 400 <invalid operation, form or fields>
+TL1 <request-id> 403 <invalid boot token>
+TL1 <request-id> 409 <busy, scanning or TX state conflict>
+```
+
+Control fields, per-boot token, payload validation and acquisition-task queue
+are shared with HTTP. Serial forms additionally reject unknown/duplicate keys
+and malformed percent escapes, including encoded NUL. IDs correlate replies;
+they do not deduplicate a repeated request or authorize commands.
+
+Requests are limited to **1024 bytes excluding LF**. Oversized, non-ASCII,
+bad-CRC or incomplete frames are discarded without acting on a suffix.
+A partial line expires after 1 second without parser progress and is discarded
+through the next LF. Bad envelopes are silent, so the host reports a timeout.
+CRC guards against accidental corruption, not malicious users with USB access.
+
+USB parsing is bounded to 128 input bytes per Arduino loop iteration. Snapshot
+serialization and USB output occur outside the acquisition-state mutex. A separate
+USB output mutex prevents log fragments from interleaving with replies.
+USB responses can delay HTTP service and log output; capture continues but the
+128-record history may overflow. Serial transport is not a lossless recorder.

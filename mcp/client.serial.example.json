@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "tracelink": {
+      "command": "node",
+      "args": ["C:/path/to/TraceLink/mcp/src/index.js"],
+      "env": {
+        "TRACELINK_SERIAL_PORT": "COM7",
+        "TRACELINK_ALLOW_TX": "0"
+      }
+    }
+  }
+}

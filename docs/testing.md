@@ -11,6 +11,8 @@ pio run
 # Native unit tests
 g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/native/history_test.cpp -o tracelink-history-test
 ./tracelink-history-test
+g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/native/control_usb_test.cpp -o tracelink-control-usb-test
+./tracelink-control-usb-test
 
 # Dashboard JavaScript syntax
 node --check <extracted inline script>
@@ -20,10 +22,22 @@ node --check <extracted inline script>
 
 There is no CI workflow in the repository; each run above is a local check.
 
+The USB/control test covers the shared HTTP/USB command parser, percent decoding,
+payload/ID/DLC limits, all busy/scanning/armed admission combinations, cursor
+limits, independent CRC vectors and buffer overflow/timeout resynchronization.
+It does not exercise UART hardware or FreeRTOS scheduling.
+
+For the MCP bridge run `npm test` from `mcp/`. The suite includes actual stdio/HTTP
+MCP clients, local HTTP mocks and a simulated OS serial binding. No real COM port
+is opened. See [mcp.md](mcp.md) for setup and Postman simulation commands.
+
 ## Checks executed so far
 
 | Check | Result | Date |
 | --- | --- | --- |
+| MCP HTTP/stdio and mocked COM suite (`npm test`, Node.js 24.13.1) | 38 passed; no physical serial port opened | 2026-11-10 |
+| Native history and shared control/USB protocol tests (`-std=c++11 -Wall -Wextra -Werror`) | Both passed | 2026-11-10 |
+| USB-enabled firmware `pio run` | Success; RAM 66,704 bytes, flash 830,205 bytes; not uploaded | 2026-11-10 |
 | `pio run` (PlatformIO Core 6.1.19, `espressif32@6.10.0`, Arduino 2.0.17) | Success; RAM 20.0%, flash 62.5% | 2026-10-22 |
 | Native tests with `g++ -std=c++11 -Wall -Wextra -Werror` | Passed | 2026-10-22 |
 | Dashboard inline script `node --check` | Passed | 2026-10-22 |
@@ -33,6 +47,7 @@ There is no CI workflow in the repository; each run above is a local check.
 
 ## Not yet verified
 
+- USB/COM MCP on the board, including driver-related reset behavior and actual firmware queue timing.
 - Wi-Fi authentication against the AP and full dashboard behavior served by the device.
 - RS485 and CAN on physical buses; RS232 capture was reported working by the user but not independently re-verified.
 - TX arm/disarm behavior, 60 s auto-disarm, fail-closed partial enable, and CAN return to listen-only on real hardware.

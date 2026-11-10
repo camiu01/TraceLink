@@ -57,7 +57,7 @@ Board identification and first USB-only boot. No upload without an identified po
 
 ### Milestone 4 — Docs and convention cleanup
 
-- [ ] Split `src/TraceLink.cpp` (486 lines, over the 400-line limit); HTTP handlers to a separate unit #style #firmware
+- [x] Split acquisition, HTTP/shared API and USB handling into `TraceLink.cpp`, `api.cpp` and `usb_console.cpp`, each under 400 lines #style #firmware
 - [ ] Keep every function under 50 executable lines; guard clauses over nesting #style
 - [ ] Replace example profile commands with the user's real documented device commands #docs #data
 - [x] Add `LICENSE` (GPLv3) #docs

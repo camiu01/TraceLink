@@ -12,6 +12,7 @@ Reading paths:
 | [usage.md](usage.md) | Main workflow, dashboard controls, API examples |
 | [architecture.md](architecture.md) | Tasks, state and buffer ownership, scan/TX state machines |
 | [api.md](api.md) | HTTP endpoints, fields, and error behavior |
+| [mcp.md](mcp.md) | Portable MCP bridge, client setup, protected TX and local tests |
 | [hardware.md](hardware.md) | Boards, modules, pin map, electrical boundaries, validation status |
 | [testing.md](testing.md) | Test commands, what is covered, what is not |
 | [troubleshooting.md](troubleshooting.md) | Observed issues and diagnostics |

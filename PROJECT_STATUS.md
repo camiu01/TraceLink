@@ -1,5 +1,65 @@
 # TraceLink: status and next steps
 
+## Verified update: 10 November 2026 (USB / COM transport)
+
+- Added an alternative MCP device connection through one explicit USB serial
+  port (`TRACELINK_SERIAL_PORT`, for example an identified `COM7`), at 115200
+  baud, 8N1. Remove `TRACELINK_URL` when using USB. Both stdio and local HTTP
+  MCP clients can use this backend. Port access is lazy and exclusive; there
+  is no port probing, reconnect, Wi-Fi fallback or automatic write retry.
+- The firmware now accepts bounded TL1 frames with request IDs, CRC32 and form
+  fields on USB/UART0. Human-readable capture logs remain available and a USB
+  output mutex prevents interleaving with API replies. GPIO assignments and
+  UART0 baud are unchanged. USB mode does not require PC Wi-Fi.
+- HTTP and USB share command/payload validation, boot-token checks, admission
+  rules and the acquisition-task queue. Embedded NUL form fields are explicitly
+  rejected instead of allowing C-string truncation; send binary NUL as HEX 00.
+  TX defaults, CAN ACK warnings, idle timeout and fail-closed execution remain.
+- Split `src/TraceLink.cpp` into acquisition/setup (275 lines),
+  `src/api.cpp` and `src/usb_console.cpp`, each below 400 lines.
+- `npm test` in `mcp/`: **38 tests passed** on Node.js 24.13.1. The serial tests
+  use the real stream with an OS mock binding, fragmented replies and a local
+  HTTP-derived wire peer, not actual ESP32 firmware execution. They cover
+  maximum-sized event batches, the 64 KiB receive boundary, TX gates, errors,
+  ambiguous writes, stale IDs, explicit connection selection and port cleanup.
+- Existing `history_test.cpp` and new `control_usb_test.cpp` passed with
+  `-std=c++11 -Wall -Wextra -Werror`. The latter checks shared validation,
+  admission states, CRC against a Python zlib vector, framing limits, malformed
+  forms, stale/oversized input and timestamp wraparound.
+- Final `pio run` passed: RAM **66,704 bytes (20.4%)**, flash **830,205 bytes
+  (63.3%)**. The user's pre-existing `include/config.h` change was preserved.
+- Setup: `docs/mcp.md`, `mcp/client.serial.example.json`; wire format:
+  `docs/api.md`. Old firmware cannot answer USB MCP commands, so a later,
+  explicitly authorized upload is required.
+- No real COM port was opened, no firmware was uploaded, and no physical bus
+  transmission or USB reset behavior was tested. Opening a USB-UART port may
+  reset the board depending on its driver. No servers/tests were left running.
+
+## Verified update: 10 November 2026 (Windows, MCP bridge)
+
+- Added `mcp/`, a separate Node.js 22+ MCP bridge using the official SDK. Stdio
+  and bearer-protected, loopback-only Streamable HTTP expose status, paginated
+  RX/TX reads, arm/disarm and single sends through the existing firmware API.
+- TX is blocked by default (`TRACELINK_ALLOW_TX=1` is an explicit host opt-in).
+  Arming/sending require `confirm:true`, but actual human approval must be
+  enforced by the MCP client. Firmware arming, idle timeout and validation remain
+  in force. CAN arming enables ACKs. Controls never automatically retry.
+- `npm test` in `mcp/`: 19 tests passed on Node.js 24.13.1, including real SDK
+  clients over stdio/HTTP, payload limits, pagination, reboot/loss handling,
+  Host/Origin/token checks, overlapping controls and uncertain write outcomes.
+- Postman CLI 1.75.0 local simulation smoke test passed through the actual stdio
+  entry point: discovery, pagination, disarm/arm, send, captured TX and final
+  disarm. The simulation log confirmed HTTP GETs and four control POSTs (202).
+  `postman status` is not supported by this installed CLI; no cloud resources
+  were created or published. The mock is derived from local firmware/API docs,
+  not a fetched team resource.
+- Existing native C++ tests passed with `-std=c++11 -Wall -Wextra -Werror`.
+  `pio run` passed: RAM 65,656 bytes, flash 828,621 bytes. No firmware source was
+  changed; the pre-existing local change in `include/config.h` was preserved.
+- See `docs/mcp.md` and `mcp/client.example.json` for setup. No client app was
+  configured automatically, no upload or hardware TX was performed, and real
+  ESP32 MCP connectivity is unverified. HTTP is local-only, not cloud hosting.
+
 ## Verified update: 23 October 2026 (Windows)
 
 - Dashboard i18n (Italian/English toggle, browser-language default, localStorage persistence) verified in a browser with mocked API traffic in both languages. JavaScript syntax check and `pio run` build passed. Not yet uploaded to the board. Firmware-side messages remain Italian.
@@ -40,7 +100,7 @@ The firmware **builds successfully** (`firmware.bin` ~805 kB, `firmware.elf` gen
 | Project | `platformio.ini`: ESP32 DevKit, Arduino, platform `espressif32@6.10.0`. |
 | Configuration | `include/config.h`: GPIOs, initial speeds, buffers, Wi-Fi, and 60-second TX window. Password override in `include/local_config.h`, excluded from Git. `rs485De` documented as unconnected for auto-direction modules. |
 | Bus modules | `include/bus_interface.h` and `src/bus_interface.cpp`: common contract plus UART/RS485/CAN adapters. Fixed C++11 aggregate init (`BusHealth` constructor) and explicit TWAI config types. |
-| Acquisition | `src/TraceLink.cpp`: acquisition task, history, USB task, and HTTP server. |
+| Acquisition/API | `src/TraceLink.cpp`: acquisition and setup; `src/api.cpp`: shared snapshots/control and HTTP; `src/usb_console.cpp`: framed USB API and capture log. |
 | History | `include/capture.h`: 128-record ring buffer, sequences, counters, and HEX conversion. |
 | Speed control | `include/commands.h` and runtime: serial estimate from RX pulses, CAN search, and manual speed change. To verify on hardware. |
 | Sending | `POST /api/control` endpoint, HEX/text/CAN-ID validation, TX disabled at boot, explicit arming, auto-disarm after 60 seconds without sends. To verify. |
@@ -132,7 +192,8 @@ g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/native/history_test.cpp -o /
 - [x] Translate all documentation to English.
 - [ ] Verify English Doxygen/JSDoc coverage on every file and public function.
 - [ ] Normalize indentation to tabs across C++/headers and the inline script.
-- [ ] Split `src/TraceLink.cpp` (486 lines, over the 400-line file limit) and keep functions under 50 executable lines.
+- [x] Split `src/TraceLink.cpp` into acquisition, API and USB modules (each under 400 lines).
+- [ ] Verify every function remains under 50 executable lines.
 - [ ] Replace example commands with the user's actually documented device commands.
 
 ### 5. Identify the ESP32 and run safe hardware tests

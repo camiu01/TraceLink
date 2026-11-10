@@ -1,0 +1,23 @@
+{
+  "name": "tracelink-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local MCP bridge for TraceLink, with explicitly enabled bus transmission",
+  "license": "GPL-3.0-only",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test --test-timeout=20000 test/*.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "2.1.2",
+    "@modelcontextprotocol/server": "2.4.0",
+    "zod": "4.6.7",
+    "serialport": "13.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@serialport/binding-mock": "10.2.2"
+  }
+}

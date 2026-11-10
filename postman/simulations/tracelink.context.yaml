@@ -1,0 +1,48 @@
+purpose:
+  stands_in_for: TraceLink ESP32 HTTP API on the paths used by the MCP bridge.
+  unblocks: Local MCP transport and TX-gate verification without hardware or bus traffic.
+assumptions:
+  - id: boot-token-and-control-queue
+    status: supported
+    claim: The checked firmware requires its current per-boot header token and returns HTTP 202 when a control is queued, not delivered.
+    reason: Both the HTTP handler implementation and the local API reference specify this distinction.
+    verification: On 2026-11-10, inspected control() and serveEvents() in the dirty tree fingerprint mcp-2026-11-10. Local bridge tests verified form/header serialization, stale-token rejection without retry, and deliveryConfirmed=false. The subsequent USB refactor in mcp-usb-2026-11-10 moved these functions to src/api.cpp; token/admission/queue behavior remains shared and 38 Node tests plus native control/USB tests passed. This is source and simulated evidence, not hardware verification.
+    source: src/api.cpp control(), submitControl() and serveEvents(); docs/api.md; mcp/test/bridge.test.js
+    updated_at: "2026-11-10"
+  - id: client-pagination
+    status: supported
+    claim: In the tested stand-in scenarios the MCP bridge advances to the last returned record rather than the firmware high-water mark.
+    reason: The firmware history returns at most 32 events per call; skipping to latest would lose unread records.
+    verification: On 2026-11-10, npm test passed 19 tests and node test/simulation.js passed against Postman CLI 1.75.0. A 40-record seed produced first cursor 32 and next record 33. Simulation request logs showed after=0, after=32 and after=40. Local HTTP tests separately exercised reboot resets and reported loss.
+    source: include/capture.h CaptureHistory::read; mcp/test/bridge.test.js; mcp/test/simulation.js
+    updated_at: "2026-11-10"
+  - id: uncertain-control-response
+    status: supported
+    claim: In the tested local HTTP scenarios, a timed-out or disconnected response after a send does not cause the bridge to repeat the control.
+    reason: Tests applied the write before delaying or dropping the response, then asserted exactly one POST and one TX record.
+    verification: On 2026-11-10, npm test passed the delayed-write, overlapping-control, disconnected-response and HTTP 400/403/409/500 cases. All uncertain results remained errors, not delivery confirmations. This establishes caller behavior against the local stand-in only.
+    source: mcp/src/bridge.js; mcp/test/bridge.test.js; postman/mocks/tracelink/handler.cjs
+    updated_at: "2026-11-10"
+  - id: hardware-execution
+    status: unknown
+    claim: The installed ESP32 firmware executes all bridge controls and physically captures or transmits the requested bus data correctly.
+    reason: No board was contacted; the mock applies controls immediately and does not emulate FreeRTOS queue timing, drivers, automatic disarm or CAN ACK effects.
+    verification: No live MCP or bus tests on 2026-11-10. A real-board test requires explicit hardware and exact-transmission authorization. Poll firmware status after each queued control; 202 alone does not settle execution or delivery.
+    source: agent.md hardware safety; src/TraceLink.cpp execute() and acquire(); PROJECT_STATUS.md
+    updated_at: "2026-11-10"
+  - id: usb-wire-and-no-retry
+    status: supported
+    claim: In the checked mock-driver scenarios, the serial backend uses TL1 CRC-framed requests, ignores unrelated reply IDs and does not retry after an uncertain write.
+    reason: Tests exercised the real serial stream with an OS mock binding. Native tests independently checked firmware parsing against the same Python zlib vector; neither test opens a hardware port.
+    verification: On 2026-11-10, fingerprint mcp-usb-2026-11-10 passed 38 Node tests, existing native history tests, new shared control/USB tests and a firmware build. Serial tests separately checked fragmented logs/replies, a maximum-sized batch, the exact receive limit, disconnect, post-write timeout, host TX opt-in, shared MCP tools and close cleanup. Full firmware execution over USB remains unverified; the local wire peer delegates to the HTTP mock and applies controls immediately.
+    source: mcp/src/serial.js; mcp/test/serial.test.js; mcp/test/serial-helpers.js; include/usb_protocol.h; test/native/control_usb_test.cpp
+    updated_at: "2026-11-10"
+fingerprints:
+  - id: mcp-2026-11-10
+    date: "2026-11-10"
+    commit: "98ed718f9a7dbefc970a38d2b3c8eafaead88743 (dirty tree, including MCP additions and pre-existing config change)"
+    cli: "Postman 1.75.0; Node.js 24.13.1; npm 9.2.0"
+  - id: mcp-usb-2026-11-10
+    date: "2026-11-10"
+    commit: "98ed718f9a7dbefc970a38d2b3c8eafaead88743 (dirty tree, USB transport additions and pre-existing config change)"
+    cli: "Node.js 24.13.1; npm 9.2.0; PlatformIO Core 6.1.19"
