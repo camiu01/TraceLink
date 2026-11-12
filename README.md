@@ -31,6 +31,7 @@ This shows the firmware booting, starting in receive-only mode, and announcing i
 | Speed probing | On request, the firmware listens for a few seconds: serial baud is estimated from RX pulse timing (an estimate that requires manual confirmation, never auto-applied), and CAN is searched listen-only over 500/250/125/1000 kbit/s. |
 | Manually armed transmission | Sending from the dashboard requires explicit arming, auto-disarms after 60 s of inactivity, fails closed on partial errors, and never resends automatically after an error. CAN sending is single-shot. |
 | Device profiles | `web/systems.json` presets fill the send form and speed fields; loading a profile never arms TX and never sends. |
+| MCP bridge | Optional Node.js server over stdio or local Streamable HTTP. Connects to the ESP32 through Wi-Fi or USB/COM, reads capture/status and queues explicitly enabled single sends. USB commands require the updated firmware; see [MCP setup](docs/mcp.md). |
 | Loss accounting | History overwrites, CAN missed/overrun/error counters, and browser-side gap counts are surfaced on the dashboard and in the API. |
 
 ### Available in the source
@@ -44,7 +45,7 @@ All features above are implemented in the current source tree. Implementation do
 
 ### Planned or deferred
 
-Open work is tracked in [TODO.md](TODO.md): web page verification on simulated APIs, safety and modularity audit, splitting `src/TraceLink.cpp` (currently over the project's 400-line file limit), replacing the example profile with documented device commands, and adding a license file.
+Open work is tracked in [TODO.md](TODO.md): web page verification on simulated APIs, safety and modularity audit, and replacing the example profile with documented device commands.
 
 ## Hardware
 
@@ -143,6 +144,19 @@ Disconnected state: if the ESP32 is unreachable, the dashboard shows a connectio
 
 ## Configuration
 
+### MCP clients
+
+For assistant access, install Node.js 22+, run `npm ci` in `mcp/`, then point your
+MCP client at the absolute path of `mcp/src/index.js`. Use Wi-Fi at
+`http://192.168.4.1`, or set `TRACELINK_SERIAL_PORT` to the verified USB port
+(for example `COM7`) and remove `TRACELINK_URL`. USB mode requires the updated
+firmware and exclusive port access; no Wi-Fi connection is needed on the PC.
+See `mcp/client.serial.example.json`. TX is blocked unless the host explicitly sets
+`TRACELINK_ALLOW_TX=1`; firmware arming and per-command approval are still required.
+
+Use [docs/mcp.md](docs/mcp.md) for stdio/HTTP configuration, tools, safety limits,
+and tests. This is a local bridge, not a public hosted MCP endpoint.
+
 There is no runtime settings store. Behavior is configured at compile time and overridden locally; the web page can only change bus speeds until the next reboot.
 
 ### Compile-time configuration
@@ -174,15 +188,17 @@ Paths are relative to the repository root.
 | `include/config.h` | Compile-time settings and GPIO map; optional `local_config.h` override. |
 | `include/capture.h` | `Capture` record, `Source` names, `CaptureHistory` ring buffer, HEX formatting. |
 | `include/commands.h` | Strict HEX parser, overflow-checked number parser, supported rate tables, baud estimation from pulse histograms. Hardware-independent and host-testable. |
+| `include/control_request.h` / `include/usb_protocol.h` | Shared control validation and bounded USB framing/CRC/form parsing, testable without a board. |
 | `include/bus_interface.h` | `BusInterface` adapter contract plus `UartBus` and `CanBus` declarations. |
 | `src/bus_interface.cpp` | UART/RS485 driver (optional DE/RE) and TWAI CAN driver (listen-only vs normal mode, single-shot TX, health counters). |
-| `src/TraceLink.cpp` | FreeRTOS tasks, adapter registry, speed-scan state machine, TX arm/timeout logic, HTTP API. |
+| `src/TraceLink.cpp` | Acquisition task, adapter registry, speed-scan state machine, TX arm/timeout logic and setup. |
+| `src/api.cpp` / `src/usb_console.cpp` | Shared snapshots/control queue, HTTP endpoints, framed USB API and serialized USB capture log. |
 | `web/index.html` | Offline dashboard: polling, cards, filters, send form, CSV export. Bus bytes are rendered as text only. |
 | `web/systems.json` | Device/command profiles, validated at build time. |
 | `scripts/embed_web.py` | PlatformIO pre-script that packs the dashboard and profiles into a generated `web_page.h`; no filesystem upload is needed. |
 | `test/native/history_test.cpp` | Host-side unit tests, no board required. |
 
-Execution flow: `setup()` starts serial, the three bus adapters, the Wi-Fi access point, and the HTTP server, then creates two FreeRTOS tasks. The acquisition task (priority 2) owns the bus adapters exclusively — it polls each bus, pushes records into the shared history, advances the speed scan, and executes queued commands. The USB task (priority 1) drains the same history to the serial monitor. The Arduino `loop()` only serves HTTP clients. A single mutex protects the history and the status block; HTTP handlers validate requests and enqueue them for the acquisition task, they never touch the buses directly. Pulse sampling for baud estimation runs in a GPIO interrupt handler that only fills histogram bins.
+Execution flow: `setup()` starts serial, the three bus adapters, the Wi-Fi access point, and the HTTP server, then creates two FreeRTOS tasks. The acquisition task (priority 2) owns the bus adapters exclusively: it polls each bus, stores records, advances the speed scan, and executes queued commands. The USB task (priority 1) drains history to the serial monitor. Arduino `loop()` serves HTTP and framed USB requests. One mutex protects acquisition state; another serializes USB log/reply output. HTTP and USB handlers validate and enqueue, never drive buses directly. Baud sampling runs in a GPIO interrupt handler.
 
 Details: [docs/architecture.md](docs/architecture.md) · HTTP API: [docs/api.md](docs/api.md)
 
@@ -217,9 +233,11 @@ Host-side tests (no board needed), run from the repository root:
 ```sh
 g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/native/history_test.cpp -o tracelink-history-test
 ./tracelink-history-test    # Windows: tracelink-history-test.exe
+g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/native/control_usb_test.cpp -o tracelink-control-usb-test
+./tracelink-control-usb-test
 ```
 
-These cover the ring history, HEX formatting, parsers, rate tables, and baud estimation. They are unit tests of hardware-independent logic; they say nothing about physical bus behavior. For web changes, the inline script is also checked with `node --check`, and dashboard behavior has been exercised in a browser against mocked API responses.
+These cover history, HEX, parsers, rates, baud estimation, shared command validation and USB framing/CRC. They do not establish physical bus behavior. Run `npm test` in `mcp/` for MCP and mocked COM tests. For web changes, the inline script is also checked with `node --check`, and dashboard behavior has been exercised in a browser against mocked API responses.
 
 Conventions: tabs for indentation, Doxygen `@file`/`@brief` headers, JSDoc on dashboard functions, firmware files under 400 lines and functions under 50 executable lines, Conventional Commits in English, no committed secrets, no push without an explicit request. Agent-facing rules live in [agent.md](agent.md).
 
@@ -229,6 +247,7 @@ Conventions: tabs for indentation, Doxygen `@file`/`@brief` headers, JSDoc on da
 | [docs/usage.md](docs/usage.md) | Dashboard workflow and HTTP API usage examples |
 | [docs/architecture.md](docs/architecture.md) | Tasks, state ownership, buffers, scan and TX state machines |
 | [docs/api.md](docs/api.md) | `/api/events`, `/api/systems`, `/api/control` reference |
+| [docs/mcp.md](docs/mcp.md) | MCP installation, stdio/HTTP clients, tools, protected TX and tests |
 | [docs/hardware.md](docs/hardware.md) | Boards, modules, wiring, electrical boundaries, validation status |
 | [docs/testing.md](docs/testing.md) | Test commands, coverage, and what remains unverified |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Observed issues and diagnostics |

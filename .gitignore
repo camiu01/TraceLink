@@ -3,3 +3,6 @@
 .vscode/
 __pycache__/
 include/local_config.h
+node_modules/
+.env
+*.ndjson

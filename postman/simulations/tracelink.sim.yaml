@@ -1,0 +1,6 @@
+simulation: tracelink-mcp
+routing: path
+mocks:
+  - name: tracelink
+    routeKey: tracelink
+    path: postman/mocks/tracelink/config.yaml

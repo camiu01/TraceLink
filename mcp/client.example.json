@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "tracelink": {
+      "command": "node",
+      "args": ["C:/path/to/TraceLink/mcp/src/index.js"],
+      "env": {
+        "TRACELINK_URL": "http://192.168.4.1",
+        "TRACELINK_ALLOW_TX": "0"
+      }
+    }
+  }
+}

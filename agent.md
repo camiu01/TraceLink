@@ -36,7 +36,10 @@ The user has explicitly asked not to damage the ESP32.
 | `include/commands.h` | Parser and baud estimation, testable without ESP32. |
 | `include/bus_interface.h` | Common adapter contract. |
 | `src/bus_interface.cpp` | UART/RS485/CAN drivers. |
-| `src/TraceLink.cpp` | Tasks, interface registry, scanning, and HTTP. |
+| `src/TraceLink.cpp` | Acquisition, interface registry, scanning, TX lifecycle and setup. |
+| `src/api.cpp` | Shared snapshots/control queue and HTTP handlers. |
+| `src/usb_console.cpp` | Framed USB API and serialized USB capture log. |
+| `include/control_request.h` / `include/usb_protocol.h` | Hardware-independent control validation and USB framing/parsing. |
 | `web/index.html` | Local dashboard, no external dependencies. |
 | `web/systems.json` | Reusable device and command profiles. |
 | `scripts/embed_web.py` | Asset embedding into the firmware. |
