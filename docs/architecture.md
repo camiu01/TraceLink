@@ -66,7 +66,24 @@ Both parts run inside the acquisition task, so acquisition continues (with possi
 
 ## TX state machine
 
-TX is disabled at boot. `arm` calls `setTransmit(true)` on every adapter; if any adapter fails, all are forced back to disabled (fail-closed). CAN arming reinstalls the driver in normal mode, which means the node ACKs bus traffic even without user commands. Each accepted send refreshes a 60 s idle timer; on expiry the acquisition task disarms TX automatically. Sends are executed once; HTTP errors never trigger retries, and CAN frames are queued single-shot (`ss = 1`), so a missing ACK does not cause retransmission.
+Software TX permission is disabled at boot. `arm` calls `setTransmit(true)` on every
+adapter; if any adapter fails, it attempts to disable every adapter and reports
+`armed:false`. The rollback return values are not checked, so this is not proof of
+physical fail-closed behavior. CAN arming reinstalls the driver in normal mode,
+which means the node ACKs bus traffic even without user commands.
+
+The arm operation and each executed send attempt refresh a 60 s idle timer,
+including a failed send attempt. The acquisition loop currently executes a pending
+command **before** checking expiry. A send at the expiry boundary can therefore
+refresh the timer first. Send/rate failures do not generally disarm all adapters.
+These source-level limitations are [open audit findings](audit-2026-11-17.md),
+not hardware-verified safety guarantees.
+
+Each queued entry is taken once; reboot can lose pending work and repeated requests
+are not deduplicated. HTTP errors never trigger application retries. CAN frames are
+queued single-shot (`ss = 1`), so a missing ACK does not cause retransmission.
+UART TX pins are still configured on initialization; software disarm is not
+electrical isolation. See the [hardware guide](hardware.md).
 
 ## Initialization and failure handling
 

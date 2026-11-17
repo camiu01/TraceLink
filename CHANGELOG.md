@@ -2,6 +2,28 @@
 
 Notable changes to TraceLink, most recent first. Dates mark when work was done in the workspace, not formal releases; there are no versioned releases yet.
 
+Historical entries describe evidence available at that date, not current validation.
+Use [PROJECT_STATUS.md](PROJECT_STATUS.md) for the current matrix and open limits.
+
+## 2026-11-17 (unreleased)
+
+- Fixed dashboard startup with an unsupported saved language and kept control
+  request results separate from polled firmware status.
+- Added six dependency-free dashboard regressions and a hardware-free CI workflow
+  for the existing pinned firmware/native/MCP toolchain. No remote workflow run.
+- Consolidated current verification status, historical evidence and open safety
+  findings; replaced unsupported wiring/isolation claims with a conditional
+  hardware guide, separate interface diagrams and preflight/pass criteria.
+- Firmware TX, protocol, GPIO configuration and dependencies were not changed.
+  No upload, physical serial access or bus operation.
+
+## 2026-11-10
+
+- Added optional local MCP stdio/HTTP bridge and explicit USB/COM backend, with
+  host TX opt-in, no automatic write retries and simulated transport tests.
+- Added TL1 USB requests and shared control validation; split acquisition/API/USB
+  modules. Historical local tests/build passed; real-board MCP remained unverified.
+
 ## 2026-10-23
 
 - Dashboard internationalization: Italian/English UI strings, header language toggle, browser-language default, choice persisted in localStorage, CSV headers follow the active language. Verified in a browser against mocked API responses (both languages, persistence, autoscroll and pause unaffected). Firmware-side status messages remain in Italian. JavaScript syntax check and firmware build passed. Not yet uploaded to the board.

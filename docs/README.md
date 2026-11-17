@@ -15,4 +15,5 @@ Reading paths:
 | [mcp.md](mcp.md) | Portable MCP bridge, client setup, protected TX and local tests |
 | [hardware.md](hardware.md) | Boards, modules, pin map, electrical boundaries, validation status |
 | [testing.md](testing.md) | Test commands, what is covered, what is not |
+| [audit-2026-11-17.md](audit-2026-11-17.md) | Fixed bugs, remaining source-level risks, evidence and approval boundaries |
 | [troubleshooting.md](troubleshooting.md) | Observed issues and diagnostics |

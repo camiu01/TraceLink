@@ -1,76 +1,75 @@
 # TODO
 
-Development task management for the TraceLink ESP32 multi-bus monitor.
+Implementation is not verification. See [PROJECT_STATUS.md](PROJECT_STATUS.md)
+for the matrix and historical evidence, and [audit findings](docs/audit-2026-11-17.md)
+for source-level risks. Hardware trials are not authorized by this checklist.
 
-## Done
+## Implemented / checked locally
 
-- [x] PlatformIO Arduino project for ESP32 DevKit (`espressif32@6.10.0`) with `TraceLink.cpp` acquisition + HTTP + USB tasks #infra #firmware
-- [x] `BusInterface` contract with `UartBus` (UART + optional DE/RE) and `CanBus` (TWAI listen-only/normal) adapters #firmware #modularity
-- [x] 128-record ring history with sequences, per-source counters and HEX formatting (`capture.h`) #firmware
-- [x] Strict HEX parser, overflow-checked numbers, serial/CAN rate tables, pulse-histogram baud estimate (`commands.h`) #firmware #tests
-- [x] TX disabled at boot, explicit arm/disarm, 60 s idle auto-disarm, fail-closed partial enable, single-shot CAN with no delivery claim #safety #firmware
-- [x] `POST /api/control` validation (HEX/text, CAN id/DLC/RTR, boot-token header, no CORS, no auto-resend) #firmware #security
-- [x] Offline dashboard: dynamic cards, filters, RX/TX view, pause/clear, CSV export with formula neutralization, text-only bus rendering #ux #web
-- [x] Speed scan UX: ~5 s listen, serial estimates for confirmation, detected CAN rate applied #ux #web
-- [x] Profile system (`systems.json` + provider endpoint): loading fills fields only, never arms or sends #ux #data
-- [x] Asset embedding (`embed_web.py` packs HTML + validated profiles into `web_page.h`, no filesystem upload) #infra
-- [x] Host-side test suite (`history_test.cpp`: history, HEX, parsers, rates, baud estimate) #tests
-- [x] Arduino C++11 build fixes: `BusHealth` constructor, explicit TWAI config types (`bus_interface.h`, `bus_interface.cpp`) #firmware
-- [x] `.venv/bin/pio run` SUCCESS (RAM 20.0%, Flash 62.3%), `firmware.bin`/`firmware.elf` + `web_page.h` generated #tests
-- [x] Native tests green (`-std=c++11 -Wall -Wextra -Werror`) and inline-script `node --check` green #tests
-- [x] Modules identified: isolated auto-direction TTL-RS485 + blue SP3232 TTL-RS232, 3.3 V TTL wiring map, UART0 kept free #docs #hardware
-- [x] English documentation pass: README, PROJECT_STATUS, agent instructions; Doxygen `@file`/`@brief` + JSDoc; tabs indentation #docs #style
-- [x] `STATO_PROGETTO.md` renamed to `PROJECT_STATUS.md` via `mv`, references updated #docs #hygiene
+- [x] Classic ESP32 PlatformIO project, pinned `espressif32@6.10.0`.
+- [x] UART/RS485 and TWAI adapters; acquisition-task ownership and shared control queue.
+- [x] 128-record RAM history, sequences, cursors and overwrite accounting.
+- [x] HEX/number validation, supported-rate tables, serial pulse-based baud estimate.
+- [x] Software TX boot default, arm/disarm, idle timer and single-shot CAN queueing.
+  This does not establish physical fail-closed behavior or timing under all failures.
+- [x] HTTP and TL1 USB APIs, boot token, bounded USB requests/CRC and strict USB forms.
+- [x] Offline bilingual dashboard, filters, pause/autoscroll, CSV formula protection.
+- [x] Profiles fill fields only; bundled commands are examples, not a real-device protocol.
+- [x] Embedded assets, native parser/history tests, MCP HTTP/stdio and mock-serial tests.
+- [x] Local build and baseline tests passed on 17 November 2026.
+- [x] Dashboard invalid-language startup and polled-away request results fixed with regressions.
+- [x] Minimal CI workflow prepared; remote execution not performed.
+- [x] Status reorganized; canonical conditional hardware guide and preflight checklist.
+- [x] GPLv3 license and English documentation.
+- [x] Historical first upload and RX-only boot documented on 22 October 2026.
+  This is not an upload of the current USB-enabled source.
+- [x] User-reported RS232/RS485 operation and commercial module descriptions
+  recorded on 17 November 2026; detailed controlled test evidence remains pending.
 
-### Docs & style (this pass)
+## Pending approval: safety / compatibility changes
 
-- [x] README rewrite in Haguruma style (tagline, What's new, Features, Bus engine, Wiring, Run it, Structure, Safety) #docs
-- [x] TODO.md in Haguruma style (Done/Pending with milestone sections and tags) #docs
+- [ ] Decide and test expiry-before-send behavior at the 60 s TX idle boundary.
+- [ ] Define fail-closed handling for send/rate failures and failed CAN stop/uninstall.
+- [ ] Decide whether malformed CAN `extended`/`rtr` values must return 400 rather than
+  silently becoming false; preserve omitted-field compatibility deliberately.
+- [ ] Cover approved changes with a driver/task harness, not just parser/mocked bridge tests.
 
-## Pending
+## Reliability and UI follow-up
 
-### Milestone 1 — Confirm wiring and upload safely
+- [ ] Serialize the CAN installation-error log with TL1 output without blocking
+  acquisition on slow USB output; test concurrent error/reply output.
+- [ ] Define bounded driver/output waits and measure acquisition/HTTP delays under load.
+- [ ] Cover bus-off, driver restarts, UART overflow and history losses on real hardware.
+- [ ] Test storage-disabled browser behavior, mobile layout, long-session pause,
+  filtered export and profile flow. Script-level tests are not layout tests.
+- [ ] Replace illustrative profile commands only when actual device documentation exists.
+- [ ] Review function/documentation conventions when touching code, not by broad reformatting.
 
-Board identification and first USB-only boot. No upload without an identified port, confirmed 3.3 V wiring and explicit authorization.
+## Hardware identification and validation
 
-- [ ] Confirm physical rewiring: UART0 free, RS232 crossed to GPIO16/17, RS485 to GPIO26/27, GPIO25 unconnected, 3.3 V TTL supplies #hardware
-- [ ] Identify ESP32 model, USB port and data cable on the host machine; record `pio device list` evidence #hardware
-- [ ] Get explicit upload authorization; flash with board port only (no full erase, no eFuse, no overclock) #hardware
-- [ ] Verify boot log, Wi-Fi AP and page load with transceivers detached and TX never armed #hardware #tests
+Use the [hardware checklist](docs/hardware.md#before-any-future-hardware-trial-user-executed)
+rather than repeating wiring instructions here.
 
-### Milestone 2 — Web page verification (simulated APIs, no bus TX)
+- [ ] Record exact DevKit/PCB revisions, USB connector/cable, converter IC markings and schematics.
+- [ ] Confirm module supply/current, receiver logic levels, signal direction, DE//RE,
+  RS485 polarity, termination/bias, signal isolation and power isolation separately.
+- [ ] Identify reference/ground/shield/earth connections; no universal bonds or floating terminals.
+- [ ] Record current wiring with photos and measurements; historic user confirmation
+  does not establish voltage, continuity or isolation.
+- [ ] Identify current board/port and obtain separate upload authorization, if needed.
+- [ ] USB-only boot of the selected build, TX disarmed; verify AP authentication/page.
+- [ ] RX-only RS232 known source: exact bytes and several known baud patterns.
+- [ ] RX-only RS485 isolated bench: known source, exact bytes, documented driver-disabled state.
+- [ ] CAN terminated bench with two active peers: ID/flags/DLC/data and reference peer logs.
+- [ ] Real MCP HTTP/USB reads, USB reset/port contention and disconnect behavior.
+- [ ] Separately authorize exact TX trials, timeout/partial-error behavior and CAN
+  normal-mode ACK, single-shot and return-to-listen-only checks.
+- [ ] Record date, firmware version/commit, configuration, topology, logs, expected
+  outcomes and pass/fail; use **not recorded** where evidence is missing.
 
-- [ ] Desktop/mobile layout, offline banner, ESP32 reboot handling, filters, pause, CSV #ux #web
-- [ ] Manual speeds, scan flow, profiles, standard/extended/RTR CAN fields #ux #web
-- [ ] Errors and TX state visible with the view paused; safety state refreshes independently #ux #safety
-- [ ] Profile-load and HTTP-result messages not covered by status polling #ux #web
-- [ ] Invalid profile cannot become an automatic send #ux #security
+## Repository hygiene
 
-### Milestone 3 — Safety and modularity audit
-
-- [ ] TX arm/disarm, timeout, partial-enable failure, concurrent requests #safety #firmware
-- [ ] CAN returns to listen-only on disarm; document queued-vs-delivered CAN semantics #safety #docs
-- [ ] Limits enforced on serial length, CAN id/DLC/payload in firmware #safety #firmware
-- [ ] Bus-off, CAN errors and driver restart behavior #firmware
-- [ ] HTTP + Wi-Fi limits assessed for sensitive/production use #security #docs
-- [ ] New-protocol extension path tested (adapter + source + validation + UI + tests) #modularity
-
-### Milestone 4 — Docs and convention cleanup
-
-- [x] Split acquisition, HTTP/shared API and USB handling into `TraceLink.cpp`, `api.cpp` and `usb_console.cpp`, each under 400 lines #style #firmware
-- [ ] Keep every function under 50 executable lines; guard clauses over nesting #style
-- [ ] Replace example profile commands with the user's real documented device commands #docs #data
-- [x] Add `LICENSE` (GPLv3) #docs
-
-### Milestone 5 — Safe hardware trials, one interface at a time
-
-- [ ] RS232 against a known source at the configured speed; compare HEX bytes #hardware #tests
-- [ ] RS485 on a live master/slave line; RX first, TX only with confirmed device + exact command #hardware #safety
-- [ ] CAN on a two-node terminated bench; check ID/DLC/data and loss counters under load #hardware #tests
-- [ ] Record real loss behavior; absence of data never counts as proof of wiring #hardware #docs
-
-### Conventions & hygiene
-
-- [ ] No committed secrets (`local_config.h` stays gitignored); versions pinned, no `latest` tags #hygiene #security
-- [ ] Conventional Commits in English; no push without request; no force-push #hygiene
-- [ ] Failing validation 3x in a row stops the pipeline and waits for guidance #hygiene
+- [ ] Keep local passwords out of commits. A pre-existing change is in tracked
+  `include/config.h`; do not stage it accidentally. Prefer the ignored local override.
+- [ ] Do not stage pre-existing `.factory/` or `security-findings.json`.
+- [ ] Review diff and validation before any separately requested Conventional Commit.

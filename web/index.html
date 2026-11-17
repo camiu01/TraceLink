@@ -96,6 +96,7 @@
         <div class="field wide"><label for="payload" data-i18n="payload">Comando / dati (massimo 64 byte seriali, 8 byte CAN)</label><textarea id="payload" name="data" rows="2" data-i18n-ph="payloadHint" placeholder="Esempio HEX: 01 03 00 00 00 02 C4 0B"></textarea></div>
       </div>
       <div class="tools"><button id="send" type="submit" disabled data-i18n="send">Invia una volta</button><span id="command-result" role="status" data-i18n="noCommand">Nessun comando inviato.</span></div>
+      <p id="device-message" role="status"></p>
     </form>
   </section>
   <div class="tools">
@@ -197,6 +198,7 @@
 	};
 	/** Active UI language; persisted in localStorage, defaults from the browser. */
 	let lang = localStorage.getItem('tracelink-lang') || ((navigator.language || 'it').toLowerCase().startsWith('en') ? 'en' : 'it');
+	if (!['it', 'en'].includes(lang)) lang = (navigator.language || 'it').toLowerCase().startsWith('en') ? 'en' : 'it';
 	/** Looks up a UI string, falling back to Italian. */
 	const t = key => strings[lang][key] ?? strings.it[key] ?? key;
 	/** Locale tag matching the active language. */
@@ -377,7 +379,8 @@
 		$('notice').textContent = warnings.join(' ');
 	}
 	/**
-	 * Updates TX/scan controls; safety state refreshes even when paused.
+	 * Updates TX/scan controls and device status separately from local request results.
+	 * Safety state refreshes even when paused.
 	 * @param {Object} data Parsed /api/events payload.
 	 * @returns {void}
 	 */
@@ -387,7 +390,7 @@
 		$('mode-tag').textContent = data.armed ? t('modeRxTx') : t('modeRx');
 		$('scan').textContent = data.scanning ? t('scanning') : t('scan');
 		$('scan-results').textContent = data.scanning ? t('scanListening') : t('scanResult')(data.estimates[0] || t('notDetected'), data.estimates[1] || t('notDetected'), data.canDetected ? data.canDetected / 1000 + ' kbit/s (' + t('applied') + ')' : t('notDetected'));
-		if (!posting) $('command-result').textContent = data.message;
+		$('device-message').textContent = data.message;
 		updateControlState();
 	}
 	/**

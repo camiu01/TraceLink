@@ -1,6 +1,6 @@
 # HTTP API reference
 
-TraceLink serves a small HTTP API from the ESP32 access point at `http://192.168.4.1`. All responses use `Cache-Control: no-store`. The API is versionless and internal to the dashboard; it is not a stable public interface.
+TraceLink serves a small HTTP API from the ESP32 access point at `http://192.168.4.1`. Successful GET responses use `Cache-Control: no-store`; error/control responses do not consistently set it. The API is versionless and internal to the dashboard; it is not a stable public interface.
 
 ## GET /
 
@@ -12,7 +12,9 @@ Returns the contents of `web/systems.json` (`application/json`): a list of devic
 
 ## GET /api/events?after=<cursor>
 
-Poll endpoint. `after` is the last sequence number already seen (decimal, up to 15 digits; anything else is HTTP 400 `invalid cursor`). Returns up to 32 events after that cursor.
+Poll endpoint. `after` is the last sequence number already seen (decimal, up to
+15 digits; omitted or empty means zero; other input is HTTP 400 `invalid cursor`).
+Returns up to 32 events after that cursor.
 
 ```json
 {
@@ -62,7 +64,7 @@ Embedded NUL bytes in form fields are rejected; use HEX `00` for a binary NUL pa
 | `bus` | `RS232`, `RS485`, `CAN` (required for `rate` and `send`) |
 | `rate` | For `rate`: one of 1200–115200 (serial) or 125000/250000/500000/1000000 (CAN) |
 | `encoding` | For `send`: `hex` or `text` (`text` not allowed for CAN) |
-| `data` | For `send`: HEX pairs (`01 03 FF`) up to 64 bytes (8 for CAN), or 1–64 UTF-8 text bytes; maximum 256 characters of input |
+| `data` | For `send`: HEX pairs (`01 03 FF`) up to 64 bytes (8 for CAN), or 1–64 UTF-8 text bytes; maximum 256 decoded input bytes |
 | `id` | For CAN `send`: identifier in HEX without `0x`, up to `7FF` (standard) or `1FFFFFFF` (extended) |
 | `extended`, `rtr` | `0`/`1`. RTR requires empty data and `dlc` 0–8 |
 | `dlc` | 0–8, RTR only |
@@ -74,7 +76,14 @@ Responses are `text/plain`:
 - `403` — invalid boot token.
 - `409` — conflicting state: scanning while armed, arming/sending during a scan, sending while disarmed, or another command in progress.
 
-Behavioral guarantees: commands execute exactly once, never retry automatically, and sending requires a prior `arm`. `arm` puts CAN in normal mode (the node sends ACKs); `disarm` returns it to listen-only. CAN sends are single-shot, so a queued frame is not retransmitted and its queuing is not a delivery confirmation.
+Each queued entry is taken once by the acquisition task, with no application-level
+automatic retry; there is no durable exactly-once guarantee. Reboot can lose pending
+work, and repeated requests can enqueue repeated commands. Sending requires a prior
+`arm`. Successful `arm` puts CAN in normal mode (the node sends ACKs); successful
+`disarm` returns it to listen-only. Verify driver readiness and status after execution.
+CAN sends are single-shot, so a queued frame is not retransmitted on missing ACK and
+its queuing is not a delivery confirmation. Status is shared and has no operation ID.
+See the [audit](audit-2026-11-17.md) for unresolved timeout/error-handling risks.
 
 ## USB serial API (TL1)
 

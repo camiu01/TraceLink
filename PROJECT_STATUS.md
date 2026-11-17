@@ -1,6 +1,115 @@
 # TraceLink: status and next steps
 
-## Verified update: 10 November 2026 (USB / COM transport)
+## Current status (17 November 2026)
+
+TraceLink is an experimental bench monitor for classic ESP32/WROOM-32: UART RS232,
+UART RS485 and classic CAN, with a local dashboard and an optional HTTP/USB MCP bridge.
+It is not a protocol decoder, CAN FD analyzer or production-validated instrument.
+
+The source implements capture, bounded RAM history, explicit TX arming, command
+queuing and baud estimation. Build/tests establish only the cases they execute.
+The current source has **not** been uploaded or validated electrically in this audit.
+Historic upload/boot evidence and user-reported capture are separated below.
+
+Audit baseline: commit `b268c87e022b0f7ec7fe738016d86ebdbc7a12da` plus pre-existing
+local configuration/untracked work and this audit's uncommitted changes.
+Firmware version: **not recorded**. `include/config.h` contains a pre-existing local
+change; it was not modified, staged or printed. `.factory/` and
+`security-findings.json` were also pre-existing and were not changed.
+
+## Verification matrix
+
+| Feature / interface | Implemented | Automatic / simulated evidence | Real hardware evidence |
+| --- | --- | --- | --- |
+| Firmware build / assets | PlatformIO, pinned `espressif32@6.10.0`, embedded dashboard | Baseline build passed 17 Nov: RAM 66,704 B, flash 830,205 B. Final audit build recorded in the log below. | Historical 22 Oct upload/boot only; not the current build |
+| History / parsers / USB framing | 128 RAM records, cursors/loss, bounded fields, TL1 request CRC/IDs | Both native C++ suites passed 17 Nov; no drivers/scheduler exercised | Not independently verified |
+| RS232 RX | UART2, GPIO16 input / GPIO17 output, 9600 8N1 default | Parser/history tests; not an electrical RX test | Working capture reported by user; date/version/commit/source/pattern **not recorded** |
+| RS485 RX / direction | UART1, GPIO26 input / GPIO27 output, optional GPIO25 DE//RE | Source inspection only for physical behavior | Working reported by user on 17 Nov; actual test date/version/RX-TX coverage not recorded; isolation unmeasured |
+| CAN RX / TX | TWAI GPIO33 input / GPIO32 output; listen-only boot; single-shot queue | Validation tests, not driver/ACK/bus-off tests | User identifies SN65HVD230 module; operation not verified, exact PCB/mode/termination unknown |
+| TX arming / idle / partial errors | Acquisition task executes single-slot queued controls | Admission/parser and bridge-gate tests only, not FreeRTOS execution/physical interlocks | Not verified; review items requiring approval remain open |
+| Baud probing | Serial pulse heuristic, CAN listen-only candidate search | Histogram unit tests only | Known-source accuracy/scan loss tests not done |
+| Dashboard | Offline assets, i18n, pause, autoscroll, text rendering, CSV | Six script-level regressions and isolated Chromium with simulated fetch, 17 Nov; historical browser checks below | Full dashboard/Wi-Fi authentication not independently verified |
+| MCP HTTP / stdio | Host TX opt-in, per-call confirmation field, no automatic command retries | 38 tests with local HTTP peers and actual MCP clients, 17 Nov | No ESP32 MCP test |
+| MCP USB | Explicit named exclusive serial stream, no discovery/fallback/reconnect | Mock OS binding and native frame parser tests, 17 Nov; not full ESP32 execution | Never exercised with the current firmware |
+| CI | Local-only build/native/MCP/dashboard workflow prepared | Commands checked locally; GitHub runner not executed | No hardware required or used |
+
+`confirm:true` is not evidence of human approval. The MCP client must enforce it.
+HTTP/USB 202 means queued, not executed or delivered. Repeated requests are not
+deduplicated. CAN normal mode sends ACKs even without user sends.
+
+## Open issues and next steps
+
+See [audit findings](docs/audit-2026-11-17.md) for confirmed defects, source-level
+risks, evidence and changes deliberately withheld pending approval.
+
+1. Resolve the TX timeout ordering, CAN driver-failure handling and strict CAN flag
+   validation design before changing safety behavior. No such change was made.
+2. Identify exact DevKit/transceiver PCBs, supplies, connector pinouts, RS485
+   direction circuit, termination/bias and signal/power isolation separately.
+   Follow the conditional [hardware guide](docs/hardware.md), not old blanket
+   assumptions about module RX/TX, 3.3 V supply, grounds or floating earth.
+3. Authorize future upload and RX-only tests separately, one interface at a time.
+   First collect known-source bytes and physical evidence; no hardware action
+   is authorized by this document.
+4. Test acquisition scheduling, bus-off, real UART overflow, USB reset/throughput,
+   60 s disarm, partial driver errors and sustained concurrent HTTP/USB load.
+   Native/MCP mocks do not establish these properties.
+5. Verify storage-disabled browsers, mobile layout and long-session pause/export
+   expectations. Pause freezes rendering while retained data continues updating;
+   CSV uses the current filtered retained records, not a frozen visual snapshot.
+
+No automatic retries, transport fallbacks, telemetry, new runtime dependencies,
+GPIO changes, uploads or real serial/bus operations were added by the audit.
+No commit, push or remote workflow was performed.
+
+At audit handoff the user chose to keep TX/compatibility findings open and deliver
+this audit. The user subsequently supplied commercial module descriptions and an
+RS485 illustration; exact PCB schematics, electrical measurements and installed
+wiring photographs remain missing.
+
+## Chronological verification log
+
+### 17 November 2026: user hardware report and publication authorization
+
+- User confirmed RS232 and RS485 working. Actual test date, firmware version,
+  commit, source device, baud and RX/TX coverage: **not recorded**.
+- User identifies an SN65HVD230 CAN transceiver module, an advertised isolated
+  auto-direction 3.3/5 V RS485 module with onboard 120 ohms, and a 3.3–5 V
+  TTL/RS232 converter. Listing specifications and illustration labels are recorded
+  in docs/hardware.md as user-supplied claims, not verified electrical ratings.
+- User authorized commit and push of the audit. Local credentials and pre-existing
+  untracked work remain excluded. The publication commit uses `[skip ci]` to
+  preserve the earlier instruction not to activate remote workflows.
+
+Historical entries retain the reports made at the time, including stronger safety
+wording later qualified by the 17 November audit. They are not current guarantees.
+
+### 17 November 2026: local software audit
+
+- Baseline: PlatformIO Core 6.1.19 build passed (RAM 66,704 B; flash 830,205 B).
+  Both C++11 native suites passed with `-Wall -Wextra -Werror`.
+  MCP `npm test`: 38/38 passed on Node.js 24.13.1 / npm 9.2.0.
+- Reproduced dashboard startup failure with an unsupported persisted language
+  (`TypeError`), and loss of a control error on the next unchanged status poll.
+  Three new assertions failed before the fixes; two unrelated checks passed.
+- Fixed language fallback and separated request results from firmware status.
+  Six dashboard tests now pass, including pause/safety refresh, reboot cursor reset,
+  text-only rendering, autoscroll position and CSV formula/quote protection.
+- Isolated Chromium, simulated fetch only: startup, text rendering, persistent
+  403 result, CSV contents, paused safety refresh, reboot, offline disabling and
+  exactly one control POST all passed. This was not a device-served page or a
+  comprehensive browser/layout test. The audit tab was closed.
+- Added a minimal GitHub Actions workflow; no remote run activated.
+- Clean isolated MCP installation (`npm ci --no-audit --no-fund`) and its test
+  suite passed 38/38; the temporary copy was removed without replacing local
+  node_modules. Final firmware build passed: RAM **66,704 B**, flash **830,413 B**.
+- Replaced unsupported electrical claims with conditional diagrams and explicit
+  unknowns. Consulted TI SN65HVD230 product page identifying Rev. O datasheet;
+  exact converter schematics remain unavailable.
+- No physical port was opened, no upload or electrical measurement occurred.
+- `postman status` is unsupported by installed CLI 1.75.0. The standalone
+  simulation was not rerun; MCP tests used the existing mock over local sockets.
+### Historical verification: 10 November 2026 (USB / COM transport)
 
 - Added an alternative MCP device connection through one explicit USB serial
   port (`TRACELINK_SERIAL_PORT`, for example an identified `COM7`), at 115200
@@ -35,7 +144,7 @@
   transmission or USB reset behavior was tested. Opening a USB-UART port may
   reset the board depending on its driver. No servers/tests were left running.
 
-## Verified update: 10 November 2026 (Windows, MCP bridge)
+### Historical verification: 10 November 2026 (Windows, MCP bridge)
 
 - Added `mcp/`, a separate Node.js 22+ MCP bridge using the official SDK. Stdio
   and bearer-protected, loopback-only Streamable HTTP expose status, paginated
@@ -60,12 +169,12 @@
   configured automatically, no upload or hardware TX was performed, and real
   ESP32 MCP connectivity is unverified. HTTP is local-only, not cloud hosting.
 
-## Verified update: 23 October 2026 (Windows)
+### Historical verification: 23 October 2026 (Windows)
 
 - Dashboard i18n (Italian/English toggle, browser-language default, localStorage persistence) verified in a browser with mocked API traffic in both languages. JavaScript syntax check and `pio run` build passed. Not yet uploaded to the board. Firmware-side messages remain Italian.
 - Documentation standardized: README rewritten, `docs/` guides (usage, architecture, API, hardware, testing, troubleshooting), `CHANGELOG.md`, and GPLv3 `LICENSE` added. `include/config.h` carries an uncommitted local password change and stays out of version control.
 
-## Verified update: 22 October 2026 (Windows)
+### Historical verification: 22 October 2026 (Windows)
 
 - Dashboard autoscroll added: follows new records by default, stops when scrolling up, and resumes with the checkbox. Verified in an isolated browser with mocked API traffic (follow, suspension, reading-position retention, resume, pause/resume, clear). JavaScript syntax, native C++ tests, and firmware build passed (flash: 819,229 bytes). This change has not been uploaded. Baud scanning is unchanged: the user has not yet tried the manual scan button.
 - Subsequent user-requested rebuild/upload with the updated configuration also passed on COM7 (flash: 818,589 bytes). Serial boot again reported RX-only and the access point; Wi-Fi authentication was not tested.
@@ -77,151 +186,16 @@
 - Wi-Fi connection and real bus RX/TX remain independently unverified. The user subsequently reported working capture. Native and simulated-browser checks for the newer autoscroll change are listed above.
 - This update supersedes the older no-upload/no-detected-board statements below. No build or monitor process was left running.
 
-Updated on 6 October 2026. Programming resumed at the user's request: firmware build succeeds, upload and hardware tests still require authorization. No ESP32 was detected on this host USB (no `ttyUSB`/`ttyACM`/`serial/by-id`, no serial bridge in `lsusb`).
+### 6 October 2026: historical build and blocked hardware access
 
-## Goal
-
-Build a PlatformIO project with the Arduino framework for classic ESP32 / ESP32-WROOM-32 that:
-
-- reads RS232 on TX2/RX2, RS485, and CAN bus;
-- shows traffic and counters on the USB monitor and the Wi-Fi web page;
-- probes unknown speeds and sets them manually;
-- sends commands from the web page only after explicit enabling;
-- adds devices and commands through profiles, and new interfaces through modules.
-
-The project name is **TraceLink**.
-
-## What is done
-
-The firmware **builds successfully** (`firmware.bin` ~805 kB, `firmware.elf` generated). It has **not been uploaded or verified on ESP32 yet**.
-
-| Area | Current state |
-| --- | --- |
-| Project | `platformio.ini`: ESP32 DevKit, Arduino, platform `espressif32@6.10.0`. |
-| Configuration | `include/config.h`: GPIOs, initial speeds, buffers, Wi-Fi, and 60-second TX window. Password override in `include/local_config.h`, excluded from Git. `rs485De` documented as unconnected for auto-direction modules. |
-| Bus modules | `include/bus_interface.h` and `src/bus_interface.cpp`: common contract plus UART/RS485/CAN adapters. Fixed C++11 aggregate init (`BusHealth` constructor) and explicit TWAI config types. |
-| Acquisition/API | `src/TraceLink.cpp`: acquisition and setup; `src/api.cpp`: shared snapshots/control and HTTP; `src/usb_console.cpp`: framed USB API and capture log. |
-| History | `include/capture.h`: 128-record ring buffer, sequences, counters, and HEX conversion. |
-| Speed control | `include/commands.h` and runtime: serial estimate from RX pulses, CAN search, and manual speed change. To verify on hardware. |
-| Sending | `POST /api/control` endpoint, HEX/text/CAN-ID validation, TX disabled at boot, explicit arming, auto-disarm after 60 seconds without sends. To verify. |
-| Dashboard | `web/index.html`: dynamic interfaces, filters, RX/TX view, pause, CSV, speed control, sending, and profile selection. Not yet tried in a browser. |
-| Profiles | `web/systems.json`: one example profile, **not a validated real protocol**. Loading a profile fills the fields, does not arm TX, and does not send. |
-| Assets | `scripts/embed_web.py`: embeds HTML and profiles into the firmware; no separate filesystem upload. `web_page.h` regenerates during build. |
-| Initial docs | `README.md`: Haguruma-style rewrite (tagline, What's new, Features, Bus engine, Wiring, Run it, Structure). Full checklist in `TODO.md`. |
-| Local tests | `test/native/history_test.cpp`: history, HEX, numeric parser, allowed speeds, and baud estimation. |
-
-### Current settings
-
-| Interface | ESP32 GPIO | Initial speed |
-| --- | --- | --- |
-| RS232 / UART2 | RX2 = 16, TX2 = 17 | 9600 baud, 8N1 |
-| RS485 / UART1 | RX = 26, TX = 27, DE+/RE = 25 (unconnected on auto-direction module) | 9600 baud, 8N1 |
-| CAN / TWAI | RX = 33, TX = 32 | 500 kbit/s, listen-only at boot |
-| USB monitor | Board UART0 (GPIO1/GPIO3, must stay free) | 115200 baud |
-
-Wi-Fi: access point `TraceLink-ESP32`, page at `http://192.168.4.1`.
-
-The fallback AP password in `include/config.h` is a public placeholder and must be overridden in `include/local_config.h` before use (the working tree currently carries an uncommitted local change to this file).
-
-## Hardware on hand and pending choices
-
-- RS232: blue TTL/UART-RS232 module with Sipex chip, 3.3-5 V. To run at 3.3 V with `VCC -> 3V3`, crossed `RXD/TXD` to GPIO17/GPIO16.
-- RS485: isolated TTL-to-RS485 auto-direction module (VIN, TX, RX, GND; A+, B+, floating earth). To run at 3.3 V with module `TX -> GPIO26`, module `RX <- GPIO27`, GPIO25 left unconnected.
-- The user previously wired 232 to RX0/TX0 and RS485 to TX2/RX2. Corrected on paper to the table above; physical rewiring still to confirm with the user.
-- The B0505XT-1WR3 (5 V to 5 V DC/DC) is not needed: the RS485 module already integrates isolation.
-- For CAN, an SN65HVD230 3.3 V module using the built-in TWAI controller was proposed. Not yet purchased or connected.
-- The user reports an attached/online ESP, but this host shows no identifiable board, no `ttyUSB`/`ttyACM` ports, and no `/dev/serial/by-id`.
-
-**No upload or bus transmission has been performed on real hardware.** Before doing so, identify the board and confirm wiring, voltages, and what is attached to the GPIOs.
-
-## Verifications performed
-
-- PlatformIO in project `.venv/`; ESP32 platform and toolchain downloads completed on 6 October 2026.
-- Fixed build errors from Arduino C++11: `BusHealth` brace init and `auto` deduction on TWAI macros (`twai_general_config_t`, `twai_timing_config_t`, `twai_filter_config_t`).
-- `.venv/bin/pio run`: **SUCCESS** (RAM 20.0%, Flash 62.3%), `firmware.bin`/`firmware.elf` generated plus `web_page.h`.
-- Local C++ tests with `-std=c++11 -Wall -Wextra -Werror`: passed after the fix.
-- JavaScript check by extracting the inline `<script>` and running `node --check`: passed.
-- Attempt with AddressSanitizer/UndefinedBehaviorSanitizer: not run because the linker missed `/usr/lib64/libasan.so.8.0.0`. Tests ran without sanitizers.
-- No dashboard check in a browser, no electrical checks, and no real RS232/RS485/CAN trials.
-
-Do not treat these checks as certification of the latest version.
-
-## What is missing, in order
-
-The full checklist lives in [TODO.md](TODO.md); this section summarizes it.
-
-### 1. Confirm wiring and upload safely
-
-- [x] Read `agent.md` and this file before resuming.
-- [x] Complete PlatformIO downloads and build.
-- [x] Fix Arduino/TWAI API incompatibilities and project warnings.
-- [x] Verify HTML/JSON header generation.
-- [x] Rerun C++ tests and JavaScript check on the latest version.
-- [ ] Confirm physical rewiring to the table above (UART0 free, 3.3 V supplies).
-- [ ] Identify ESP32 model, USB port, and cable; get upload authorization; no full erase or eFuse changes.
-
-Commands from the project folder:
-
-```sh
-.venv/bin/pio run
-g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/native/history_test.cpp -o /tmp/tracelink-history-test
-/tmp/tracelink-history-test
-```
-
-### 2. Complete and verify the web page
-
-- [ ] Try the page with simulated APIs, without sending anything on real buses.
-- [ ] Check desktop/mobile, offline state, ESP32 reboot, filters, pause, and CSV.
-- [ ] Try manual speeds, scanning, profiles, and standard/extended/RTR CAN fields.
-- [ ] Check errors and TX state even with the view paused.
-- [ ] Verify profile-load/HTTP-result messages are not immediately covered by status polling.
-- [ ] Verify an invalid profile cannot become an automatic send.
-
-### 3. Verify safety and modularity
-
-- [ ] Check TX arm/disarm, timeout, partial errors, and concurrent requests.
-- [ ] Verify CAN really returns to listen-only when TX is disabled.
-- [ ] Check limits on serial data, CAN ID, DLC, and payload.
-- [ ] Document the difference between a queued CAN frame and an actually delivered frame: today's `twai_transmit()` success does not confirm delivery.
-- [ ] Verify bus-off behavior, CAN errors, and driver restarts.
-- [ ] Assess that HTTP and Wi-Fi access are not enough for sensitive or production plants.
-- [ ] Refine extensions: the dashboard reads dynamic descriptors, but speeds, payloads, and some CAN/RS232/RS485 parts remain specific. New protocols need code and tests.
-
-### 4. Finish documentation and code-convention cleanup
-
-- [x] Translate all documentation to English.
-- [ ] Verify English Doxygen/JSDoc coverage on every file and public function.
-- [ ] Normalize indentation to tabs across C++/headers and the inline script.
-- [x] Split `src/TraceLink.cpp` into acquisition, API and USB modules (each under 400 lines).
-- [ ] Verify every function remains under 50 executable lines.
-- [ ] Replace example commands with the user's actually documented device commands.
-
-### 5. Identify the ESP32 and run safe hardware tests
-
-- [ ] Recheck USB and serial port, board model, and data cable.
-- [ ] Ask for wiring confirmation before flashing or changing GPIO configuration.
-- [ ] For the first trial prefer a board connected **via USB only**, without transceivers or external buses.
-- [ ] Get upload authorization; no full erase or eFuse modification.
-- [ ] Verify boot, serial, and Wi-Fi without arming TX.
-- [ ] Connect and test one interface at a time, with correct voltages.
-- [ ] Use a known source to verify serial estimates at several speeds.
-- [ ] Test CAN on a bench with at least two active nodes and correct termination.
-- [ ] Run TX trials only after explicit user confirmation of device, wiring, speed, and exact command.
-- [ ] Measure losses and under-load behavior; record real results.
-
-## Limits to remember
-
-- No speed detection is possible on a line without traffic.
-- Serial probing is a **pulse-timing estimate**, not guaranteed baud-rate, parity, or protocol recognition. It never applies the estimate automatically.
-- CAN search tries 500/250/125/1000 kbit/s for about 1.2 seconds each; it stops after three received frames and keeps the detected speed. Without results it restores the initial speed.
-- During CAN probing, speed and driver change temporarily: frames can be lost and driver counters can restart.
-- GPIO sampling, speed changes, and UART sending can affect simultaneous acquisition.
-- The default serial format is 8N1; there is no parity scan.
-- CAN FD is not supported.
-- No Modbus decoding or automatic CRC generation: commands are user-supplied bytes.
-- History is in RAM, without persistent storage. UART overflows are not counted.
-- A new profile adds commands of a device on existing interfaces; it does not create new physical ports.
-
-## Resume point
-
-Build is green; do not rebuild from scratch. Next: confirm the rewiring table, identify the ESP32 USB port on the machine that physically hosts it, get explicit upload authorization, then boot with USB only and no TX. Update this document with evidence and any errors. Do not start background builds, servers, or tests when suspending.
+- Historical environment: project `.venv/`, PlatformIO downloads completed.
+  Arduino C++11 fixes included the BusHealth constructor and explicit TWAI config types.
+- `.venv/bin/pio run` succeeded: RAM 20.0%, flash 62.3%, firmware.bin/ELF and web
+  header generated. Firmware version and commit: **not recorded**.
+- Native tests and extracted-script JavaScript syntax passed.
+- ASan/UBSan was not run: linker lacked `/usr/lib64/libasan.so.8.0.0`.
+- That host showed no ttyUSB/ttyACM/serial-by-id or USB serial bridge; no upload,
+  browser or physical bus verification was recorded **at that time**.
+  This does not negate the later 22 October upload or simulated browser checks.
+- Older unchecked first-upload/browser checklists are superseded by the matrix
+  above. Remaining work is in TODO.md and the hardware checklist.

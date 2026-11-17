@@ -25,7 +25,7 @@ The header badge shows the connection state: `Connesso · acquisizione attiva`, 
 | `Interfaccia` selector | Filters the table to one bus. |
 | `Pausa vista` | Freezes rendering; capture on the device continues and the safety state (TX armed or not) keeps refreshing. |
 | `Pulisci vista` | Clears the browser-side view; the device history is not erased. |
-| `Esporta CSV` | Downloads the visible records as a `;`-separated CSV (UTF-8 with BOM). Cells that look like spreadsheet formulas are prefixed with `'` to neutralize them. |
+| `Esporta CSV` | Downloads the currently retained records matching the filter as a `;`-separated CSV (UTF-8 with BOM). While paused, these may differ from the frozen table. Cells that look like spreadsheet formulas are prefixed with `'` to neutralize them. |
 
 The browser keeps at most 500 records; the device history holds 128 records in RAM and overwrites the oldest. If the browser falls behind, the gap is reported as missed records.
 
@@ -41,10 +41,14 @@ The browser keeps at most 500 records; the device history holds 128 records in R
 
 1. Press `Abilita trasmissione` and confirm the dialog. The tag changes to `RX + TX`; CAN switches to normal mode and sends ACKs on the bus.
 2. Fill the form: interface, `HEX` or `Testo UTF-8`, payload. For CAN also set the identifier (HEX without `0x`), standard/extended format, data or remote (RTR) frame, and DLC for RTR.
-3. Press `Invia una volta`. The request is validated in the firmware (HEX syntax, lengths, identifier range, DLC) and executed once. The send appears as a `TX` row.
+3. Press `Invia una volta`. The firmware validates and queues the request (202), not a delivery confirmation. Read the separate device-status message; a successful driver write/queue adds a `TX` row. Reboot or driver failure can prevent execution. Never resend automatically.
 4. TX disarms automatically 60 seconds after the last send, or immediately with `Disabilita trasmissione`.
 
 A `TX` row means the firmware wrote the bytes or queued the CAN frame. It is not a delivery confirmation from the device.
+
+The request result stays separate from the device's shared status, so polling
+does not erase an HTTP rejection or timeout. Other clients can change device
+status; it is not a per-request execution receipt.
 
 Optionally pick a `Sistema` and `Comando salvato` and press `Carica nei campi`: the form and speed fields are filled from `web/systems.json`. Loading a profile never arms TX and never sends anything. The bundled profile is an example, not a validated device protocol.
 

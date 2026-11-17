@@ -6,6 +6,11 @@ It is a bench tool for people who need to observe traffic between industrial or 
 
 Current scope: one RS232 direction on UART2, one RS485 port on UART1, and one classic CAN bus on the built-in TWAI controller. History lives in RAM (128 records) and nothing is persisted across reboots.
 
+Experimental bench tool, not a protocol decoder, CAN FD analyzer or production-validated instrument.
+The current source passes local build/tests; that is not physical validation.
+See the [verification matrix](PROJECT_STATUS.md#verification-matrix) and
+[hardware guide](docs/hardware.md) before choosing modules or connecting equipment.
+
 [What it does](#what-it-does) · [Hardware](#hardware) · [Wiring](#wiring-and-board-configuration) · [Build and flash](#build-and-flash) · [Everyday use](#controls-and-everyday-use) · [Configuration](#configuration) · [Architecture](#firmware-architecture) · [Limitations](#limitations-and-troubleshooting) · [Development](#development) · [License](#credits-and-license)
 
 ## See it in action
@@ -29,7 +34,7 @@ This shows the firmware booting, starting in receive-only mode, and announcing i
 | Offline web dashboard | The ESP32 serves a page at `http://192.168.4.1` on its own access point, with no Internet and no external web dependencies. Shows live records, counters, loss warnings, filters, pause, autoscroll, and CSV export. The interface is bilingual (Italian/English) with a header toggle; the choice persists in the browser and the default follows the browser language. Status messages coming from the firmware remain in Italian. |
 | USB serial mirror | Every captured record is also printed on the USB monitor at 115200 baud as `#seq ms SOURCE RX/TX` plus HEX data, with CAN id/flags/DLC. |
 | Speed probing | On request, the firmware listens for a few seconds: serial baud is estimated from RX pulse timing (an estimate that requires manual confirmation, never auto-applied), and CAN is searched listen-only over 500/250/125/1000 kbit/s. |
-| Manually armed transmission | Sending from the dashboard requires explicit arming, auto-disarms after 60 s of inactivity, fails closed on partial errors, and never resends automatically after an error. CAN sending is single-shot. |
+| Manually armed transmission | Software arming, a 60 s idle timer and partial-arm rollback are implemented; timeout/error edge cases remain under review. No automatic resend. CAN sending is single-shot. See the [audit](docs/audit-2026-11-17.md). |
 | Device profiles | `web/systems.json` presets fill the send form and speed fields; loading a profile never arms TX and never sends. |
 | MCP bridge | Optional Node.js server over stdio or local Streamable HTTP. Connects to the ESP32 through Wi-Fi or USB/COM, reads capture/status and queues explicitly enabled single sends. USB commands require the updated firmware; see [MCP setup](docs/mcp.md). |
 | Loss accounting | History overwrites, CAN missed/overrun/error counters, and browser-side gap counts are surfaced on the dashboard and in the API. |
@@ -41,47 +46,36 @@ All features above are implemented in the current source tree. Implementation do
 ### Experimental and incompletely validated
 
 - Serial baud estimation is a pulse-timing heuristic. It can pick the wrong rate depending on data patterns and it requires at least ~20 edges of real traffic. It never changes the configured speed by itself.
-- Real-bus capture was reported working by the user on RS232; RS485 and CAN have not been exercised on hardware. Wi-Fi authentication and full dashboard behavior have not been independently verified.
+- The user reports RS232 and RS485 working; firmware identity, test conditions and RX/TX coverage are not recorded, and this is not independent verification. CAN remains unverified. Wi-Fi authentication and full dashboard behavior have not been independently verified.
 
 ### Planned or deferred
 
-Open work is tracked in [TODO.md](TODO.md): web page verification on simulated APIs, safety and modularity audit, and replacing the example profile with documented device commands.
+Open work is tracked in [TODO.md](TODO.md): hardware identification, physical validation,
+remaining safety findings and replacing the example profile with documented device commands.
 
 ## Hardware
 
-| Component | Verified model or specification | Required / optional | Function |
-| --- | --- | --- | --- |
-| MCU board | ESP32-WROOM-32 DevKit; flashed and identified as ESP32-D0WD-V3 rev 3.1 | Required | Runs the firmware; USB port used for flashing and the monitor |
-| RS232 converter | SP3232-class TTL/RS232 module, powered at 3.3 V | Optional (needed for RS232) | Level conversion between RS232 lines and ESP32 GPIOs |
-| RS485 converter | Isolated auto-direction TTL/RS485 module, powered at 3.3 V | Optional (needed for RS485) | Level conversion and isolation for the RS485 pair |
-| CAN transceiver | SN65HVD230-class 3.3 V module | Optional (needed for CAN) | Physical layer for the built-in TWAI controller |
-| USB data cable | Connected to the board UART0 bridge (observed as a Silicon Labs CP210x on the host) | Required | Flashing and 115200 baud monitor |
-
-ESP32 GPIOs are 3.3 V only and are not 5 V tolerant. Never connect RS232, RS485, or CAN signals directly to GPIOs; always go through the transceiver modules.
+Use the [hardware and wiring guide](docs/hardware.md) as the single source for
+the bill of materials, supply requirements, point-to-point tables, logical RS232/
+RS485/CAN diagrams, RX-only versus TX-capable connections, USB ownership and
+preflight checklist. Exact converter models, connectors and isolation are not
+yet established; do not wire from module RX/TX labels alone.
 
 ## Wiring and board configuration
 
-The firmware expects this fixed map (`include/config.h`). UART0 (GPIO1/GPIO3) must stay free for USB flashing and the monitor.
+The implemented chip GPIO map in `include/config.h` is:
 
-| ESP32 | RS232 module (TTL side) | RS485 module (TTL side) | CAN module |
+| Function | ESP32 input | ESP32 output | Direction control |
 | --- | --- | --- | --- |
-| 3V3 | VCC | VIN | VCC |
-| GND | GND | GND (TTL side only) | GND |
-| GPIO16 / RX2 | Module TXD | — | — |
-| GPIO17 / TX2 | Module RXD | — | — |
-| GPIO26 / UART1 RX | — | Module TX | — |
-| GPIO27 / UART1 TX | — | Module RX | — |
-| GPIO25 | — | Leave unconnected (auto-direction module) | — |
-| GPIO32 | — | — | Transceiver TXD |
-| GPIO33 | — | — | Transceiver RXD |
+| UART2 / RS232 | GPIO16 | GPIO17 | None |
+| UART1 / RS485 | GPIO26 | GPIO27 | GPIO25 for compatible manual DE//RE only |
+| TWAI / classic CAN | GPIO33 | GPIO32 | Transceiver mode circuit not controlled |
+| USB bridge / UART0 | GPIO3 | GPIO1 | Reserved for board USB bridge |
 
-External bus-side notes, verified against the modules on hand:
-
-- RS232: connect only the device line to be observed to the module RXD input, in parallel with the existing wiring; leave the module's RS232-side TX output unconnected for passive listening. RS232 levels must never reach a GPIO.
-- RS485: A/B twisted pair; the earth terminal stays floating; the module already integrates isolation, so no extra DC/DC converter is needed.
-- CAN: attach CANH/CANL on a bus with at least two active nodes and correct termination.
-
-For first power-up after flashing, prefer a board connected via USB only, with bus wiring detached. Electrical compatibility between the monitored equipment ground and the board ground must be confirmed before joining them; when in doubt, use isolated receivers.
+These are not physical header positions or verified module connector pinouts.
+Software TX disabled at boot does not guarantee electrically disconnected outputs:
+UART initialization still configures TX, and reset behavior is unmeasured.
+No universal DB9, A/B polarity, ground, shield or wire-color mapping is prescribed.
 
 ## Build and flash
 
@@ -132,7 +126,7 @@ Main workflow: flash and boot → connect to the `TraceLink-ESP32` access point 
 | Wait for traffic | Records appear in the table with sequence, ESP32 timestamp, bus/direction, HEX, and ASCII preview; per-bus counters update on the cards. Autoscroll follows new records and stops when you scroll up. |
 | Pick an interface filter | Only records from that bus are shown. |
 | Pausa vista / clear | Freezes or clears the browser view; capture on the device continues. |
-| Esporta CSV | Downloads a `;`-separated CSV of the visible records with spreadsheet-formula neutralization. |
+| Esporta CSV | Downloads filtered retained records with spreadsheet-formula neutralization; while paused these may differ from the frozen table. |
 | Controlla velocità | Starts a passive listen (~3 s serial sampling plus CAN search). Serial results are shown as estimates to confirm by hand; a detected CAN rate is applied. Nothing is detected on a silent line. |
 | Applica (speed selector on a card) | Changes that bus speed until the next reboot; not persistent. |
 | Abilita trasmissione | Arms TX after a confirmation dialog. CAN switches to normal mode and sends ACKs on the bus. Auto-disarms 60 s after the last send. |
@@ -140,7 +134,7 @@ Main workflow: flash and boot → connect to the `TraceLink-ESP32` access point 
 
 Minimal end-to-end example (illustrative): on the dashboard select the RS232 card speed `9600`, arm TX, choose HEX, enter `01 03 00 00 00 02 C4 0B`, press **Invia una volta**. The send appears as a `TX` row. Whether the device answers depends entirely on its protocol; TraceLink does not compute checksums or decode application protocols.
 
-Disconnected state: if the ESP32 is unreachable, the dashboard shows a connection error and retries automatically.
+Disconnected state: the dashboard shows a connection error and retries status reads automatically, never control commands.
 
 ## Configuration
 
@@ -220,12 +214,12 @@ Hardware verification status, known issues, and resume points are maintained in 
 
 ## Development
 
-Toolchain: PlatformIO Core with platform `espressif32@6.10.0`, board `esp32dev`, Arduino framework 2.0.17. Build flags: `-Wall -Wextra`. There is no CI workflow in the repository.
+Toolchain: PlatformIO Core 6.1.19 with platform `espressif32@6.10.0`, board `esp32dev`, Arduino framework 2.0.17. Build flags: `-Wall -Wextra`. The [CI workflow](.github/workflows/ci.yml) builds firmware and runs native, MCP and dashboard script checks without hardware. It has been prepared locally, not run on GitHub during this audit.
 
 ```sh
 pio run                     # firmware build (also regenerates web_page.h)
-pio run --target upload     # flash, after identifying the port
-pio device monitor --baud 115200
+# Hardware actions are separate: identify the board/port and obtain authorization.
+# See Build and flash; never use an automatically selected upload port.
 ```
 
 Host-side tests (no board needed), run from the repository root:
@@ -238,6 +232,10 @@ g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/native/control_usb_test.cpp 
 ```
 
 These cover history, HEX, parsers, rates, baud estimation, shared command validation and USB framing/CRC. They do not establish physical bus behavior. Run `npm test` in `mcp/` for MCP and mocked COM tests. For web changes, the inline script is also checked with `node --check`, and dashboard behavior has been exercised in a browser against mocked API responses.
+
+Run `node --test test/web/dashboard.test.mjs` for dependency-free syntax and
+script-level dashboard regressions. The minimal DOM is not a browser layout engine.
+The [audit](docs/audit-2026-11-17.md) records fixes, remaining risks and test limits.
 
 Conventions: tabs for indentation, Doxygen `@file`/`@brief` headers, JSDoc on dashboard functions, firmware files under 400 lines and functions under 50 executable lines, Conventional Commits in English, no committed secrets, no push without an explicit request. Agent-facing rules live in [agent.md](agent.md).
 

@@ -1,0 +1,42 @@
+name: Local checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.1'
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+      - name: Install the verified PlatformIO Core
+        run: python -m pip install platformio==6.1.19
+      - name: Build firmware without hardware
+        run: pio run
+      - name: Native C++ tests
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/native/history_test.cpp -o /tmp/tracelink-history-test
+          /tmp/tracelink-history-test
+          g++ -std=c++11 -Wall -Wextra -Werror -Iinclude test/native/control_usb_test.cpp -o /tmp/tracelink-control-usb-test
+          /tmp/tracelink-control-usb-test
+      - name: Install locked MCP dependencies
+        working-directory: mcp
+        run: npm ci
+      - name: MCP tests (local HTTP and simulated serial only)
+        working-directory: mcp
+        run: npm test
+      - name: Dashboard syntax and script-level regressions
+        run: node --test test/web/dashboard.test.mjs
