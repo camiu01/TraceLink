@@ -1,5 +1,7 @@
 # Hardware and wiring
 
+[← README](../README.md) · [Docs index](README.md)
+
 This is the single wiring guide. All diagrams are **logical, not physical or to scale**.
 A firmware-compatible pin map is not proof that a connection is electrically safe.
 Do not connect unidentified modules or external equipment using labels alone.

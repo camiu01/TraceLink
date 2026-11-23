@@ -1,4 +1,20 @@
+<div align="center">
+
 # TraceLink
+### Multi-bus RS232 / RS485 / CAN monitor firmware for ESP32
+
+[![License GPLv3](https://img.shields.io/badge/License_GPLv3-blue)](LICENSE)
+![C++](https://img.shields.io/badge/C++-00599C?logo=cplusplus&logoColor=white)
+![ESP32](https://img.shields.io/badge/ESP32-E7352C?logo=espressif&logoColor=white)
+![PlatformIO](https://img.shields.io/badge/PlatformIO-F5822A?logo=platformio&logoColor=white)
+
+<img src="docs/images/dashboard.png" alt="TraceLink web dashboard showing RS232, RS485 and CAN cards and a traffic table" width="720" />
+
+<sub>Dashboard served by the firmware, shown here with simulated traffic from a mocked API.</sub>
+
+[What it does](#what-it-does) · [Getting started](#getting-started) · [Usage](#usage) · [Configuration](#configuration) · [How it works](#how-it-works) · [Limitations](#limitations) · [Development](#development) · [License](#license)
+
+</div>
 
 TraceLink is a multi-bus monitor firmware for the classic ESP32 (ESP32-WROOM-32) that listens to RS232, RS485, and classic CAN at the same time and shows the captured traffic on a USB serial log and on a self-hosted web dashboard. It is built with PlatformIO and the Arduino framework.
 
@@ -10,21 +26,6 @@ Experimental bench tool, not a protocol decoder, CAN FD analyzer or production-v
 The current source passes local build/tests; that is not physical validation.
 See the [verification matrix](PROJECT_STATUS.md#verification-matrix) and
 [hardware guide](docs/hardware.md) before choosing modules or connecting equipment.
-
-[What it does](#what-it-does) · [Hardware](#hardware) · [Wiring](#wiring-and-board-configuration) · [Build and flash](#build-and-flash) · [Everyday use](#controls-and-everyday-use) · [Configuration](#configuration) · [Architecture](#firmware-architecture) · [Limitations](#limitations-and-troubleshooting) · [Development](#development) · [License](#credits-and-license)
-
-## See it in action
-
-Real boot output captured from the serial monitor (115200 baud) after flashing an ESP32-D0WD-V3 over USB on 22 October 2026:
-
-```text
-rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
-...
-TraceLink | RX only al boot | TX da abilitare esplicitamente
-Wi-Fi: TraceLink-ESP32 | http://192.168.4.1
-```
-
-This shows the firmware booting, starting in receive-only mode, and announcing its Wi-Fi access point. Firmware status messages are currently in Italian. No dashboard screenshots or device photographs exist in the repository yet.
 
 ## What it does
 
@@ -53,7 +54,22 @@ All features above are implemented in the current source tree. Implementation do
 Open work is tracked in [TODO.md](TODO.md): hardware identification, physical validation,
 remaining safety findings and replacing the example profile with documented device commands.
 
-## Hardware
+### See it in action
+
+Real boot output captured from the serial monitor (115200 baud) after flashing an ESP32-D0WD-V3 over USB on 22 October 2026:
+
+```text
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+...
+TraceLink | RX only al boot | TX da abilitare esplicitamente
+Wi-Fi: TraceLink-ESP32 | http://192.168.4.1
+```
+
+This shows the firmware booting, starting in receive-only mode, and announcing its Wi-Fi access point. Firmware status messages are currently in Italian. No dashboard screenshots or device photographs exist in the repository yet.
+
+## Getting started
+
+### Hardware
 
 Use the [hardware and wiring guide](docs/hardware.md) as the single source for
 the bill of materials, supply requirements, point-to-point tables, logical RS232/
@@ -61,7 +77,7 @@ RS485/CAN diagrams, RX-only versus TX-capable connections, USB ownership and
 preflight checklist. Exact converter models, connectors and isolation are not
 yet established; do not wire from module RX/TX labels alone.
 
-## Wiring and board configuration
+### Wiring and board configuration
 
 The implemented chip GPIO map in `include/config.h` is:
 
@@ -77,7 +93,7 @@ Software TX disabled at boot does not guarantee electrically disconnected output
 UART initialization still configures TX, and reset behavior is unmeasured.
 No universal DB9, A/B polarity, ground, shield or wire-color mapping is prescribed.
 
-## Build and flash
+### Build and flash
 
 Prerequisites: PlatformIO Core (verified with 6.1.19), Python 3, a data USB cable, and a host that sees the board's serial port.
 
@@ -117,7 +133,8 @@ Prerequisites: PlatformIO Core (verified with 6.1.19), Python 3, a data USB cabl
 
 7. First-use check: the boot log shows the receive-only banner and the access point line. Then connect a device to the `TraceLink-ESP32` network, keep the connection when the OS warns there is no Internet, and open `http://192.168.4.1`.
 
-## Controls and everyday use
+<a id="controls-and-everyday-use"></a>
+## Usage
 
 Main workflow: flash and boot → connect to the `TraceLink-ESP32` access point → open `http://192.168.4.1` → watch captured traffic appear in the table → optionally probe speeds → optionally arm TX and send one command at a time.
 
@@ -173,7 +190,8 @@ All options live in `include/config.h`; changing them requires a rebuild and ref
 
 Bus speeds can be changed per card and apply immediately until reboot. Values outside the supported rate tables are rejected by the firmware. Nothing else is configurable at runtime.
 
-## Firmware architecture
+<a id="firmware-architecture"></a>
+## How it works
 
 Paths are relative to the repository root.
 
@@ -196,7 +214,8 @@ Execution flow: `setup()` starts serial, the three bus adapters, the Wi-Fi acces
 
 Details: [docs/architecture.md](docs/architecture.md) · HTTP API: [docs/api.md](docs/api.md)
 
-## Limitations and troubleshooting
+<a id="limitations-and-troubleshooting"></a>
+## Limitations
 
 | Symptom / limitation | Checks and boundary |
 | --- | --- |
@@ -253,7 +272,8 @@ Conventions: tabs for indentation, Doxygen `@file`/`@brief` headers, JSDoc on da
 | [TODO.md](TODO.md) | Done/pending work and milestones |
 | [CHANGELOG.md](CHANGELOG.md) | Dated history of notable changes |
 
-## Credits and license
+<a id="credits-and-license"></a>
+## License
 
 Maintained by **Camiu** ([@camiu01](https://github.com/camiu01)). Built on the Arduino ESP32 core and the ESP-IDF TWAI driver, via PlatformIO.
 

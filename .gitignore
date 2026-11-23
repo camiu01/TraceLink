@@ -6,3 +6,7 @@ include/local_config.h
 node_modules/
 .env
 *.ndjson
+
+# Windows folder customisation (FolderMania)
+desktop.ini
+.foldermania*

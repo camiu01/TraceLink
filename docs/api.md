@@ -1,5 +1,7 @@
 # HTTP API reference
 
+[← README](../README.md) · [Docs index](README.md)
+
 TraceLink serves a small HTTP API from the ESP32 access point at `http://192.168.4.1`. Successful GET responses use `Cache-Control: no-store`; error/control responses do not consistently set it. The API is versionless and internal to the dashboard; it is not a stable public interface.
 
 ## GET /

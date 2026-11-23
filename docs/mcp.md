@@ -1,5 +1,7 @@
 # MCP bridge
 
+[← README](../README.md) · [Docs index](README.md)
+
 TraceLink includes a Node.js MCP server in `mcp/`. It reaches the ESP32 either
 over Wi-Fi using the [HTTP API](api.md), or over the board's USB serial port
 (Windows COM, Linux/macOS device path). Wi-Fi works with the existing API firmware;

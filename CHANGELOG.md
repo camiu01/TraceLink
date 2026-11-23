@@ -1,23 +1,44 @@
 # Changelog
 
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+
 Notable changes to TraceLink, most recent first. Dates mark when work was done in the workspace, not formal releases; there are no versioned releases yet.
 
 Historical entries describe evidence available at that date, not current validation.
 Use [PROJECT_STATUS.md](PROJECT_STATUS.md) for the current matrix and open limits.
 
-## 2026-11-17 (unreleased)
+## [Unreleased]
 
-- Fixed dashboard startup with an unsupported saved language and kept control
-  request results separate from polled firmware status.
+### Changed
+
+- Documentation aligned with the shared camiu01 conventions: README layout, TODO grouped by area, this changelog format and the docs/ index.
+
+## 2026-11-17
+
+### Added
+
 - Added six dependency-free dashboard regressions and a hardware-free CI workflow
   for the existing pinned firmware/native/MCP toolchain. No remote workflow run.
+
+### Changed
+
 - Consolidated current verification status, historical evidence and open safety
   findings; replaced unsupported wiring/isolation claims with a conditional
   hardware guide, separate interface diagrams and preflight/pass criteria.
 - Firmware TX, protocol, GPIO configuration and dependencies were not changed.
   No upload, physical serial access or bus operation.
 
+### Fixed
+
+- Fixed dashboard startup with an unsupported saved language and kept control
+  request results separate from polled firmware status.
+
 ## 2026-11-10
+
+### Added
 
 - Added optional local MCP stdio/HTTP bridge and explicit USB/COM backend, with
   host TX opt-in, no automatic write retries and simulated transport tests.
@@ -26,16 +47,22 @@ Use [PROJECT_STATUS.md](PROJECT_STATUS.md) for the current matrix and open limit
 
 ## 2026-10-23
 
+### Changed
+
 - Dashboard internationalization: Italian/English UI strings, header language toggle, browser-language default, choice persisted in localStorage, CSV headers follow the active language. Verified in a browser against mocked API responses (both languages, persistence, autoscroll and pause unaffected). Firmware-side status messages remain in Italian. JavaScript syntax check and firmware build passed. Not yet uploaded to the board.
 - Documentation set standardized: README rewritten, `docs/` index and guides added, `CHANGELOG.md` and GPLv3 `LICENSE` added.
 
 ## 2026-10-22
+
+### Changed
 
 - Dashboard autoscroll: follows new records, stops when scrolling up, resumes via checkbox. Checked in a browser against mocked API responses.
 - Firmware built (RAM 20.0%, flash 62.5% of the default partition) and uploaded to an ESP32-D0WD-V3 over COM7 with hash verification; serial boot confirmed receive-only mode and the access point announcement. TX was not armed. The autoscroll build itself has not been uploaded.
 - Local fallback AP password configuration changed in the working tree (uncommitted local configuration).
 
 ## 2026-10-06
+
+### Changed
 
 - PlatformIO/Arduino project for ESP32 DevKit completed: `BusInterface` contract with `UartBus` and `CanBus`, 128-record ring history, strict HEX/number parsers, baud estimation.
 - TX policy implemented: disabled at boot, explicit arm, 60 s idle auto-disarm, fail-closed partial enable, single-shot CAN with no delivery claim.

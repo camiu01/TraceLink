@@ -1,5 +1,7 @@
 # Testing and validation
 
+[← README](../README.md) · [Docs index](README.md)
+
 Paths are relative to the repository root. This document distinguishes checks that have been executed from procedures that still need to be performed.
 
 ## Host-side checks (no board required)

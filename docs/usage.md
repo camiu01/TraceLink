@@ -1,5 +1,7 @@
 # Usage guide
 
+[← README](../README.md) · [Docs index](README.md)
+
 This guide covers the everyday workflow of TraceLink once the firmware is flashed. Paths are relative to the repository root. The dashboard is bilingual: the header toggle switches between Italian and English, the choice persists in the browser (localStorage), and the initial language follows the browser language. Italian labels are quoted below. Status messages returned by the firmware (`message` field, control responses) remain in Italian.
 
 ## Startup

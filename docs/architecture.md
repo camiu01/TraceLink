@@ -1,5 +1,7 @@
 # Firmware architecture
 
+[← README](../README.md) · [Docs index](README.md)
+
 Paths are relative to the repository root. This document describes the architecture as implemented, not an intended redesign.
 
 ## Overview

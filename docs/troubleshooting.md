@@ -1,5 +1,7 @@
 # Troubleshooting
 
+[← README](../README.md) · [Docs index](README.md)
+
 Observed issues and diagnostics. Causes marked as uncertain have not been root-caused yet; none of these entries are confirmed firmware bugs unless stated.
 
 ## Host and toolchain
